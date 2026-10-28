@@ -177,15 +177,23 @@ fun NowPlayingScreen(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // === 1. CINEMATIC LIGHTING (Artwork Blur in Player Area) ===
-            Image(
-                painter = painterResource(id = R.drawable.img_default_album_cover),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+            TrackArtwork(
+                track = currentTrack,
                 modifier = Modifier
                     .fillMaxSize()
                     .blur(50.dp)
                     .alpha(0.38f)
-            )
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.img_default_album_cover),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blur(50.dp)
+                        .alpha(0.38f)
+                )
+            }
 
             // Ambient Dynamic Aura radial light leak
             Box(
@@ -345,12 +353,17 @@ fun NowPlayingScreen(
                                 .border(2.dp, aura.dominant, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.img_default_album_cover),
-                                contentDescription = "Album Art",
-                                contentScale = ContentScale.Crop,
+                            TrackArtwork(
+                                track = currentTrack,
                                 modifier = Modifier.fillMaxSize()
-                            )
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.img_default_album_cover),
+                                    contentDescription = "Album Art",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
 
                         // Center spindle hole

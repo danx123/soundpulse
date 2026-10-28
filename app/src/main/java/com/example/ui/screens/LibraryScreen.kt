@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -78,6 +79,7 @@ import com.example.data.model.AudioSourceType
 import com.example.data.model.AudioTrack
 import com.example.ui.components.AppFooterCard
 import com.example.ui.components.FormatBadge
+import com.example.ui.components.TrackArtwork
 import com.example.ui.components.formatTime
 import com.example.ui.theme.DarkBg
 import com.example.ui.theme.DarkCardBorder
@@ -131,6 +133,7 @@ fun LibraryScreen(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
+            persistFolderPermission(context, uri)
             onPlayFromFolder(uri)
         }
     }
@@ -140,6 +143,7 @@ fun LibraryScreen(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
+            persistFolderPermission(context, uri)
             onScanFolder(uri)
         }
     }
@@ -496,27 +500,33 @@ fun TrackItemRow(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                if (isCurrent && isPlaying) {
-                    Icon(
-                        imageVector = Icons.Default.GraphicEq,
-                        contentDescription = "Playing",
-                        tint = NeonCyan,
-                        modifier = Modifier.size(24.dp)
-                    )
-                } else if (isCurrent) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Selected",
-                        tint = NeonCyan,
-                        modifier = Modifier.size(24.dp)
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.AudioFile,
-                        contentDescription = null,
-                        tint = TextSecondary,
-                        modifier = Modifier.size(22.dp)
-                    )
+                TrackArtwork(
+                    track = track,
+                    modifier = Modifier.fillMaxSize(),
+                    sizePx = 128
+                ) {
+                    if (isCurrent && isPlaying) {
+                        Icon(
+                            imageVector = Icons.Default.GraphicEq,
+                            contentDescription = "Playing",
+                            tint = NeonCyan,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    } else if (isCurrent) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = "Selected",
+                            tint = NeonCyan,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.AudioFile,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
 
@@ -603,5 +613,16 @@ fun TrackItemRow(
                 }
             }
         }
+    }
+}
+
+
+private fun persistFolderPermission(context: android.content.Context, uri: Uri) {
+    try {
+        context.contentResolver.takePersistableUriPermission(
+            uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+        )
+    } catch (_: Exception) {
+        // Provider tidak mendukung izin persisten: abaikan
     }
 }

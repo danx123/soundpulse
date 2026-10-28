@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadata
 import android.media.session.MediaSession
@@ -19,6 +20,13 @@ import androidx.core.content.ContextCompat
 import com.example.MainActivity
 import com.example.R
 import com.example.data.model.AudioTrack
+import com.example.ui.components.ArtworkLoader
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 private const val TAG = "AudioPlaybackService"
 private const val NOTIFICATION_ID = 1001
@@ -27,6 +35,8 @@ private const val CHANNEL_ID = "soundpulse_audio_playback"
 class AudioPlaybackService : Service() {
 
     private var mediaSession: MediaSession? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var artJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -108,21 +118,18 @@ class AudioPlaybackService : Service() {
             }
             ACTION_UPDATE -> {
                 val track = AudioPlayerBridge.activeTrack
-                val isPlaying = AudioPlayerBridge.isPlaying
-                val position = AudioPlayerBridge.currentPositionMs
-                val duration = AudioPlayerBridge.durationMs
-
                 if (track != null) {
-                    updateMediaSession(track, isPlaying, position, duration)
-                    val notification = buildNotification(track, isPlaying)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        startForeground(
-                            NOTIFICATION_ID,
-                            notification,
-                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-                        )
-                    } else {
-                        startForeground(NOTIFICATION_ID, notification)
+                    render(track, ArtworkLoader.peek(track))
+
+                    // Artwork belum ada di cache: muat di background lalu render ulang
+                    if (ArtworkLoader.peek(track) == null && !ArtworkLoader.hasFailed(track)) {
+                        artJob?.cancel()
+                        artJob = serviceScope.launch {
+                            val art = ArtworkLoader.load(applicationContext, track, 512)
+                            if (art != null && AudioPlayerBridge.activeTrack?.id == track.id) {
+                                render(track, art)
+                            }
+                        }
                     }
                 } else {
                     stopServiceInternal()
@@ -133,11 +140,33 @@ class AudioPlaybackService : Service() {
         return START_STICKY
     }
 
+    private fun render(track: AudioTrack, art: Bitmap?) {
+        val isPlaying = AudioPlayerBridge.isPlaying
+        updateMediaSession(
+            track,
+            isPlaying,
+            AudioPlayerBridge.currentPositionMs,
+            AudioPlayerBridge.durationMs,
+            art
+        )
+        val notification = buildNotification(track, isPlaying, art)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+    }
+
     private fun updateMediaSession(
         track: AudioTrack,
         isPlaying: Boolean,
         positionMs: Long,
-        durationMs: Long
+        durationMs: Long,
+        art: Bitmap?
     ) {
         val session = mediaSession ?: return
 
@@ -165,10 +194,14 @@ class AudioPlaybackService : Service() {
             .putString(MediaMetadata.METADATA_KEY_ALBUM, track.album)
             .putLong(MediaMetadata.METADATA_KEY_DURATION, if (durationMs > 0) durationMs else track.durationMs)
 
+        if (art != null) {
+            metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, art)
+        }
+
         session.setMetadata(metadataBuilder.build())
     }
 
-    private fun buildNotification(track: AudioTrack, isPlaying: Boolean): Notification {
+    private fun buildNotification(track: AudioTrack, isPlaying: Boolean, art: Bitmap?): Notification {
         val contentIntent = PendingIntent.getActivity(
             this,
             0,
@@ -252,6 +285,7 @@ class AudioPlaybackService : Service() {
             .setContentText("${track.artist} • ${track.album}")
             .setSubText("${track.format.displayName} Lossless SoundPulse")
             .setContentIntent(contentIntent)
+            .apply { if (art != null) setLargeIcon(art) }
             .setStyle(mediaStyle)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(isPlaying)
@@ -277,6 +311,8 @@ class AudioPlaybackService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        artJob?.cancel()
+        serviceScope.cancel()
         mediaSession?.apply {
             isActive = false
             release()

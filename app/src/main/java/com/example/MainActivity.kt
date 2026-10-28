@@ -67,6 +67,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.AboutDialog
 import com.example.ui.components.AddToPlaylistDialog
+import com.example.ui.components.FolderLoadedPlaylistDialog
 import com.example.ui.components.MiniPlayer
 import com.example.ui.components.NowPlayingScreen
 import com.example.ui.components.TrackDetailsDialog
@@ -136,6 +137,7 @@ fun SoundPulseApp(
     val mostPlayedStats by viewModel.mostPlayedStats.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val formatFilter by viewModel.formatFilter.collectAsState()
+    val folderLoadedState by viewModel.folderLoadedState.collectAsState()
 
     var showAboutDialog by remember { mutableStateOf(false) }
 
@@ -388,6 +390,7 @@ fun SoundPulseApp(
                     onTrackSelect = { track -> viewModel.playTrack(track, filteredTracks) },
                     onImportLocalFiles = { uris -> viewModel.importLocalFiles(uris) },
                     onScanFolder = { uri -> viewModel.scanFolderTree(uri) },
+                    onPlayFromFolder = { uri -> viewModel.playFromFolder(uri) },
                     onShowTrackDetails = { track -> viewModel.showTrackDetails(track) },
                     onToggleFavorite = { id -> viewModel.toggleFavorite(id) },
                     onAddToPlaylist = { track -> viewModel.openAddToPlaylistDialog(track) },
@@ -523,6 +526,20 @@ fun SoundPulseApp(
                 }
             },
             onDismiss = { viewModel.openAddToPlaylistDialog(null) }
+        )
+    }
+
+    // Dialog "Tambahkan folder ke playlist" setelah daftar lagu folder selesai dimuat
+    folderLoadedState?.let { state ->
+        FolderLoadedPlaylistDialog(
+            folderName = state.folderName,
+            tracks = state.tracks,
+            existingPlaylists = playlistsWithTracks,
+            onCreateNewPlaylist = { name -> viewModel.addFolderToNewPlaylist(name, state.tracks) },
+            onAddToExistingPlaylist = { id, name ->
+                viewModel.addFolderToExistingPlaylist(id, name, state.tracks)
+            },
+            onDismiss = { viewModel.dismissFolderLoadedDialog() }
         )
     }
 

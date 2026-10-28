@@ -459,6 +459,7 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun playFromFolder(treeUri: Uri) {
         viewModelScope.launch {
+            _userMessage.value = "Memuat folder…"
             val (folderName, tracks) = repository.loadFolderTracks(treeUri)
             if (tracks.isNotEmpty()) {
                 playTrack(tracks.first(), tracks)

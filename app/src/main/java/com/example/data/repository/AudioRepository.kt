@@ -6,6 +6,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.util.Log
 import com.example.data.model.AudioFormat
 import com.example.data.model.AudioSourceType
@@ -282,34 +283,53 @@ class AudioRepository(private val context: Context) {
         )
     }
 
+    private fun displayNameOf(uri: Uri): String? = try {
+        context.contentResolver.query(
+            uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+        )?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+    } catch (e: Exception) {
+        null
+    }
+
     suspend fun importLocalUrisAndReturn(uris: List<Uri>): List<AudioTrack> = withContext(Dispatchers.IO) {
+        val result = mutableListOf<AudioTrack>()
         val newTracks = mutableListOf<AudioTrack>()
-        val mmr = MediaMetadataRetriever()
+        val existingByUri = _tracks.value.associateBy { it.uri }
 
         for (uri in uris) {
-            try {
-                mmr.setDataSource(context, uri)
-                val title = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-                    ?: uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.')
-                    ?: "Audio Track"
-                val artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: "Unknown Artist"
-                val album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: "Local Files"
-                val durationStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                val duration = durationStr?.toLongOrNull() ?: 0L
-                val bitrate = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull()?.let { it / 1000 } ?: 320
-                val mimeType = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+            // Pakai ulang lagu yang sudah ada di library (id stabil, tidak dobel)
+            val already = existingByUri[uri.toString()]
+            if (already != null) {
+                result.add(already)
+                continue
+            }
 
-                val ext = uri.lastPathSegment?.substringAfterLast('.', "") ?: "mp3"
-                val format = when {
-                    mimeType?.contains("flac") == true -> AudioFormat.FLAC
-                    mimeType?.contains("wav") == true -> AudioFormat.WAV
-                    mimeType?.contains("aac") == true -> AudioFormat.AAC
-                    mimeType?.contains("ogg") == true -> AudioFormat.OGG
-                    mimeType?.contains("opus") == true -> AudioFormat.OPUS
-                    else -> AudioFormat.fromExtension(ext)
-                }
+            val displayName = displayNameOf(uri)
+            val baseName = displayName?.substringBeforeLast('.')
+            val ext = displayName?.substringAfterLast('.', "") ?: ""
 
-                newTracks.add(
+            val track = try {
+                val mmr = MediaMetadataRetriever()
+                try {
+                    mmr.setDataSource(context, uri)
+                    val title = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                        ?.takeIf { it.isNotBlank() } ?: baseName ?: "Audio Track"
+                    val artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: "Unknown Artist"
+                    val album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: "Local Files"
+                    val duration = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                    val bitrate = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
+                        ?.toIntOrNull()?.let { it / 1000 } ?: 320
+                    val mimeType = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+
+                    val format = when {
+                        mimeType?.contains("flac") == true -> AudioFormat.FLAC
+                        mimeType?.contains("wav") == true -> AudioFormat.WAV
+                        mimeType?.contains("aac") == true -> AudioFormat.AAC
+                        mimeType?.contains("ogg") == true -> AudioFormat.OGG
+                        mimeType?.contains("opus") == true -> AudioFormat.OPUS
+                        else -> AudioFormat.fromExtension(ext)
+                    }
+
                     AudioTrack(
                         id = UUID.randomUUID().toString(),
                         title = title,
@@ -324,39 +344,35 @@ class AudioRepository(private val context: Context) {
                         fileSizeFormatted = "Local Audio",
                         artworkUrl = null
                     )
-                )
+                } finally {
+                    try { mmr.release() } catch (_: Exception) {}
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "Error extracting metadata for $uri", e)
-                val fallbackTitle = uri.lastPathSegment?.substringAfterLast('/') ?: "Local Audio File"
-                newTracks.add(
-                    AudioTrack(
-                        id = UUID.randomUUID().toString(),
-                        title = fallbackTitle,
-                        artist = "Local Artist",
-                        album = "Imported",
-                        durationMs = 0L,
-                        uri = uri.toString(),
-                        sourceType = AudioSourceType.LOCAL_FILE,
-                        format = AudioFormat.MP3,
-                        bitrateKbps = 320,
-                        sampleRateHz = 44100,
-                        fileSizeFormatted = "Local File"
-                    )
+                AudioTrack(
+                    id = UUID.randomUUID().toString(),
+                    title = baseName ?: "Local Audio File",
+                    artist = "Unknown Artist",
+                    album = "Imported",
+                    durationMs = 0L,
+                    uri = uri.toString(),
+                    sourceType = AudioSourceType.LOCAL_FILE,
+                    format = AudioFormat.fromExtension(ext),
+                    bitrateKbps = 320,
+                    sampleRateHz = 44100,
+                    fileSizeFormatted = "Local File"
                 )
             }
-        }
 
-        try {
-            mmr.release()
-        } catch (e: Exception) {
-            // ignore
+            newTracks.add(track)
+            result.add(track)
         }
 
         if (newTracks.isNotEmpty()) {
             _tracks.value = newTracks + _tracks.value
         }
 
-        newTracks
+        result
     }
 
     suspend fun importLocalUris(uris: List<Uri>): Int {
@@ -374,55 +390,55 @@ class AudioRepository(private val context: Context) {
         return treeUri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/') ?: "Folder Musik"
     }
 
-    suspend fun loadFolderTracks(treeUri: Uri): Pair<String, List<AudioTrack>> = withContext(Dispatchers.IO) {
-        val folderName = extractFolderName(treeUri)
-        val discoveredUris = mutableListOf<Uri>()
-        try {
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-                treeUri,
-                DocumentsContract.getTreeDocumentId(treeUri)
-            )
+    private fun collectAudioUris(
+        treeUri: Uri,
+        parentDocId: String,
+        out: MutableList<Pair<String, Uri>>,
+        depth: Int = 0
+    ) {
+        if (depth > 6) return
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE
+        )
+        val subDirs = mutableListOf<String>()
 
-            val projection = arrayOf(
-                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                DocumentsContract.Document.COLUMN_MIME_TYPE
-            )
+        context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+            while (cursor.moveToNext()) {
+                val docId = cursor.getString(0) ?: continue
+                val name = cursor.getString(1) ?: ""
+                val mime = cursor.getString(2) ?: ""
 
-            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                val idIdx = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                val nameIdx = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                val mimeIdx = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
-
-                while (cursor.moveToNext()) {
-                    val docId = cursor.getString(idIdx)
-                    val name = cursor.getString(nameIdx)
-                    val mime = cursor.getString(mimeIdx)
-
-                    val isAudio = mime?.startsWith("audio/") == true ||
-                            name.endsWith(".mp3", ignoreCase = true) ||
-                            name.endsWith(".flac", ignoreCase = true) ||
-                            name.endsWith(".wav", ignoreCase = true) ||
-                            name.endsWith(".m4a", ignoreCase = true) ||
-                            name.endsWith(".aac", ignoreCase = true) ||
-                            name.endsWith(".ogg", ignoreCase = true) ||
-                            name.endsWith(".opus", ignoreCase = true)
-
+                if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                    subDirs.add(docId)
+                } else {
+                    val isAudio = mime.startsWith("audio/") ||
+                        listOf(".mp3", ".flac", ".wav", ".m4a", ".aac", ".ogg", ".opus")
+                            .any { name.endsWith(it, ignoreCase = true) }
                     if (isAudio) {
-                        val fileDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
-                        discoveredUris.add(fileDocUri)
+                        out.add(name to DocumentsContract.buildDocumentUriUsingTree(treeUri, docId))
                     }
                 }
             }
+        }
+
+        // Rekursi ke subfolder setelah cursor ditutup
+        subDirs.forEach { collectAudioUris(treeUri, it, out, depth + 1) }
+    }
+
+    suspend fun loadFolderTracks(treeUri: Uri): Pair<String, List<AudioTrack>> = withContext(Dispatchers.IO) {
+        val folderName = extractFolderName(treeUri)
+        val found = mutableListOf<Pair<String, Uri>>()
+        try {
+            collectAudioUris(treeUri, DocumentsContract.getTreeDocumentId(treeUri), found)
         } catch (e: Exception) {
             Log.e(TAG, "Error scanning folder tree $treeUri", e)
         }
 
-        val loadedTracks = if (discoveredUris.isNotEmpty()) {
-            importLocalUrisAndReturn(discoveredUris)
-        } else {
-            emptyList()
-        }
+        val sortedUris = found.sortedBy { it.first.lowercase() }.map { it.second }
+        val loadedTracks = if (sortedUris.isNotEmpty()) importLocalUrisAndReturn(sortedUris) else emptyList()
 
         Pair(folderName, loadedTracks)
     }

@@ -61,6 +61,7 @@ import com.example.data.local.entity.PlaylistType
 import com.example.data.local.entity.PlaylistWithTracks
 import com.example.data.model.AudioTrack
 import com.example.ui.components.FormatBadge
+import com.example.ui.components.TrackArtwork
 import com.example.ui.components.formatTime
 import com.example.ui.theme.DarkBg
 import com.example.ui.theme.DarkCardBorder
@@ -352,20 +353,26 @@ fun PlaylistDetailSheet(
                                     .background(DarkSurfaceVariant),
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (isCurrent && isPlaying) {
-                                    Icon(
-                                        imageVector = Icons.Default.GraphicEq,
-                                        contentDescription = "Playing",
-                                        tint = NeonCyan,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = null,
-                                        tint = if (isCurrent) NeonCyan else TextSecondary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                TrackArtwork(
+                                    track = audioTrack,
+                                    modifier = Modifier.fillMaxSize(),
+                                    sizePx = 128
+                                ) {
+                                    if (isCurrent && isPlaying) {
+                                        Icon(
+                                            imageVector = Icons.Default.GraphicEq,
+                                            contentDescription = "Playing",
+                                            tint = NeonCyan,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            tint = if (isCurrent) NeonCyan else TextSecondary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
                                 }
                             }
 
