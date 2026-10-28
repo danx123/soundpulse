@@ -391,6 +391,7 @@ fun SoundPulseApp(
                     onShowTrackDetails = { track -> viewModel.showTrackDetails(track) },
                     onToggleFavorite = { id -> viewModel.toggleFavorite(id) },
                     onAddToPlaylist = { track -> viewModel.openAddToPlaylistDialog(track) },
+                    onScanMediaStore = { viewModel.scanMediaStoreAudio() },
                     onAboutClick = { showAboutDialog = true }
                 )
 

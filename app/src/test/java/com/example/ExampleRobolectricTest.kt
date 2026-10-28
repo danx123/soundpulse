@@ -218,4 +218,22 @@ class ExampleRobolectricTest {
     assertNotNull(auraColors.secondary)
     assertNotNull(auraColors.auraLinearBrush)
   }
+
+  @Test
+  fun `verify Android 9+ strings and resources`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val scanDeviceAudioStr = context.getString(R.string.scan_device_audio)
+    assertTrue("String scan_device_audio harus ada", scanDeviceAudioStr.isNotEmpty())
+
+    val featAndroid9Str = context.getString(R.string.about_feat_android9)
+    assertTrue("String about_feat_android9 harus ada", featAndroid9Str.isNotEmpty())
+  }
+
+  @Test
+  fun `verify MediaStore scanning executes safely`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val repository = AudioRepository(context)
+    val count = repository.scanMediaStoreAudio()
+    assertTrue("Scan MediaStore harus selesai tanpa exception (ditemukan $count)", count >= 0)
+  }
 }

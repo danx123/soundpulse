@@ -1,6 +1,9 @@
 package com.example.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -34,6 +37,7 @@ import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -60,11 +64,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.example.R
 import com.example.data.model.AudioFormat
 import com.example.data.model.AudioSourceType
 import com.example.data.model.AudioTrack
@@ -98,9 +106,25 @@ fun LibraryScreen(
     onShowTrackDetails: (AudioTrack) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onAddToPlaylist: (AudioTrack) -> Unit,
+    onScanMediaStore: () -> Unit = {},
     onAboutClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val audioPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_AUDIO
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            onScanMediaStore()
+        }
+    }
+
     // Open Document Tree launcher for folder scanning
     val folderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -223,6 +247,45 @@ fun LibraryScreen(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Impor File Audio", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Scan device audio button for Android 9+ (MediaStore scanning)
+        Button(
+            onClick = {
+                val hasPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    audioPermission
+                ) == PackageManager.PERMISSION_GRANTED
+                if (hasPermission) {
+                    onScanMediaStore()
+                } else {
+                    permissionLauncher.launch(audioPermission)
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .testTag("scan_device_audio_btn"),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = DarkSurfaceVariant,
+                contentColor = HighResGreen
+            ),
+            shape = RoundedCornerShape(12.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, HighResGreen.copy(alpha = 0.5f))
+        ) {
+            Icon(
+                imageVector = Icons.Default.PhoneAndroid,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.scan_device_audio),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            )
         }
 
         Spacer(modifier = Modifier.height(10.dp))

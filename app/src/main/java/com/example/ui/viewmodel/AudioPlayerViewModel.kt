@@ -429,6 +429,17 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    fun scanMediaStoreAudio() {
+        viewModelScope.launch {
+            val count = repository.scanMediaStoreAudio()
+            _userMessage.value = if (count > 0) {
+                "Pindai perangkat selesai: $count lagu ditambahkan ke library"
+            } else {
+                "Pindai selesai: Semua lagu perangkat sudah ada di library"
+            }
+        }
+    }
+
     fun addCloudTrack(title: String, artist: String, url: String, provider: String, format: AudioFormat) {
         val track = repository.addCloudTrack(title, artist, url, provider, format)
         _userMessage.value = "Track cloud ditambahkan: ${track.title}"

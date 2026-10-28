@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -181,6 +182,11 @@ fun AboutDialog(
                         icon = Icons.Default.Star,
                         iconTint = GlowAmber,
                         text = stringResource(R.string.about_feat_ai)
+                    )
+                    FeatureHighlightRow(
+                        icon = Icons.Default.PhoneAndroid,
+                        iconTint = HighResGreen,
+                        text = stringResource(R.string.about_feat_android9)
                     )
                 }
 

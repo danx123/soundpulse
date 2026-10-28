@@ -102,13 +102,15 @@
     <string name="about_title">Tentang SoundPulse</string>
     <string name="about_tagline">Mesin Audio Audiophile &amp; Kecerdasan Buatan Generasi Baru</string>
     <string name="about_version">v1.0.0 Pro Studio Edition</string>
-    <string name="about_description">SoundPulse adalah pemutar audio pintar generasi modern yang dirancang khusus untuk para penikmat musik dan audiophile sejati. Dilengkapi dukungan format audio luas (FLAC, MP3, WAV, AAC, OGG, Opus), teknologi Cinematic Lighting dengan ambient artwork blur, Dynamic Aura yang menyesuaikan warna kontrol dengan artwork album secara real-time, 5-Band Studio Equalizer dengan Bass Boost &amp; 3D Reverb, pemutar folder lokal &amp; cloud storage, serta kurasi cerdas AI Smart Playlist.</string>
+    <string name="scan_device_audio">Pindai Lagu Perangkat (Android 9+)</string>
+    <string name="about_description">SoundPulse adalah pemutar audio pintar generasi modern yang dirancang khusus untuk para penikmat musik dan audiophile sejati. Dilengkapi dukungan format audio luas (FLAC, MP3, WAV, AAC, OGG, Opus), teknologi Cinematic Lighting dengan ambient artwork blur, Dynamic Aura yang menyesuaikan warna kontrol dengan artwork album secara real-time, 5-Band Studio Equalizer dengan Bass Boost &amp; 3D Reverb, pemutar folder lokal &amp; cloud storage, kurasi cerdas AI Smart Playlist, serta kompatibilitas penuh dari Android 9.0 Pie (API 28) hingga versi terbaru.</string>
     <string name="about_highlights_title">Fitur Unggulan</string>
     <string name="about_feat_cinematic">Cinematic Lighting &amp; Dynamic Aura</string>
     <string name="about_feat_hires">Audio Studio Lossless (Hingga 96kHz / 24-bit)</string>
     <string name="about_feat_cloud">Cloud Storage &amp; Folder Penyimpanan Lokal</string>
     <string name="about_feat_equalizer">Equalizer Grafis 5-Band, Bass Boost &amp; 3D Reverb</string>
     <string name="about_feat_ai">Smart DJ Berbasis AI &amp; Playlist Paling Sering Diputar</string>
+    <string name="about_feat_android9">Dukungan Penuh Android 9+ (API 28 - 36)</string>
     <string name="about_footer_brand">Macan Angkasa</string>
     <string name="about_footer_by">Dibuat dengan dedikasi tinggi oleh</string>
     <string name="about_copyright">© 2026 Macan Angkasa. Seluruh hak cipta dilindungi.</string>

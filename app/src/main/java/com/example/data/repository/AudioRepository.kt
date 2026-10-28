@@ -1,9 +1,11 @@
 package com.example.data.repository
 
+import android.content.ContentUris
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.util.Log
 import com.example.data.model.AudioFormat
 import com.example.data.model.AudioSourceType
@@ -405,6 +407,100 @@ class AudioRepository(private val context: Context) {
         } else {
             0
         }
+    }
+
+    /**
+     * Scans audio tracks from MediaStore. Supported across Android 9+ (API 28+).
+     * Works with READ_EXTERNAL_STORAGE on API 28-32, and READ_MEDIA_AUDIO on API 33+.
+     */
+    suspend fun scanMediaStoreAudio(): Int = withContext(Dispatchers.IO) {
+        val discoveredTracks = mutableListOf<AudioTrack>()
+        try {
+            val contentUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+            val projection = arrayOf(
+                MediaStore.Audio.Media._ID,
+                MediaStore.Audio.Media.TITLE,
+                MediaStore.Audio.Media.ARTIST,
+                MediaStore.Audio.Media.ALBUM,
+                MediaStore.Audio.Media.DURATION,
+                MediaStore.Audio.Media.SIZE,
+                MediaStore.Audio.Media.MIME_TYPE
+            )
+            val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+            val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
+
+            context.contentResolver.query(
+                contentUri,
+                projection,
+                selection,
+                null,
+                sortOrder
+            )?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+                val artistCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+                val albumCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
+                val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
+                val mimeCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.MIME_TYPE)
+
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idCol)
+                    val title = cursor.getString(titleCol) ?: "Unknown Track"
+                    val artist = cursor.getString(artistCol) ?: "Unknown Artist"
+                    val album = cursor.getString(albumCol) ?: "Device Audio"
+                    val duration = cursor.getLong(durationCol)
+                    val sizeBytes = cursor.getLong(sizeCol)
+                    val mime = cursor.getString(mimeCol)
+
+                    val trackUri = ContentUris.withAppendedId(contentUri, id)
+
+                    val format = when {
+                        mime?.contains("flac") == true -> AudioFormat.FLAC
+                        mime?.contains("wav") == true -> AudioFormat.WAV
+                        mime?.contains("aac") == true -> AudioFormat.AAC
+                        mime?.contains("ogg") == true -> AudioFormat.OGG
+                        mime?.contains("opus") == true -> AudioFormat.OPUS
+                        mime?.contains("mp4") == true || mime?.contains("m4a") == true -> AudioFormat.AAC
+                        else -> AudioFormat.MP3
+                    }
+
+                    val sizeFormatted = if (sizeBytes > 0) {
+                        String.format("%.1f MB", sizeBytes / (1024.0 * 1024.0))
+                    } else {
+                        "Local File"
+                    }
+
+                    discoveredTracks.add(
+                        AudioTrack(
+                            id = "mediastore_$id",
+                            title = title,
+                            artist = if (artist.equals("<unknown>", ignoreCase = true)) "Unknown Artist" else artist,
+                            album = if (album.equals("<unknown>", ignoreCase = true)) "Device Audio" else album,
+                            durationMs = duration,
+                            uri = trackUri.toString(),
+                            sourceType = AudioSourceType.LOCAL_FILE,
+                            format = format,
+                            bitrateKbps = if (format.isLossless) 1411 else 320,
+                            sampleRateHz = if (format.isLossless) 96000 else 44100,
+                            fileSizeFormatted = sizeFormatted
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error scanning MediaStore audio", e)
+        }
+
+        if (discoveredTracks.isNotEmpty()) {
+            val existingUris = _tracks.value.map { it.uri }.toSet()
+            val newTracks = discoveredTracks.filter { it.uri !in existingUris }
+            if (newTracks.isNotEmpty()) {
+                _tracks.value = newTracks + _tracks.value
+            }
+            return@withContext newTracks.size
+        }
+        return@withContext 0
     }
 
     fun addCloudTrack(
