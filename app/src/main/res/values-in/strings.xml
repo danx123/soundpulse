@@ -1,0 +1,99 @@
+<resources>
+    <string name="app_name">SoundPulse</string>
+    <string name="app_subtitle">Audio Player • Room DB • Hi-Res</string>
+
+    <!-- Navigation Tabs -->
+    <string name="tab_library">Library</string>
+    <string name="tab_playlists">Playlist</string>
+    <string name="tab_ai_hub">AI DJ</string>
+    <string name="tab_streaming">Streaming</string>
+    <string name="tab_cloud">Cloud</string>
+    <string name="tab_equalizer">Equalizer</string>
+
+    <!-- Library Screen -->
+    <string name="search_placeholder">Cari lagu, artis, atau album…</string>
+    <string name="scan_folder">Pindai Folder</string>
+    <string name="import_audio_files">Impor File Audio</string>
+    <string name="all_formats">Semua Format</string>
+    <string name="tracks_count">%1$d Audio Track</string>
+    <string name="hires_lossless_count">%1$d Hi-Res Lossless</string>
+    <string name="no_tracks_found">Tidak ada lagu yang cocok</string>
+    <string name="library_empty_hint">Gunakan tombol di atas untuk memilih folder atau impor file audio dari memori perangkat.</string>
+
+    <!-- Player Screen -->
+    <string name="collapse_player">Tutup Pemutar</string>
+    <string name="track_info">Spesifikasi Audio</string>
+    <string name="speed">Kecepatan</string>
+    <string name="normal_speed">Normal</string>
+    <string name="set_sleep_timer">Atur Sleep Timer</string>
+    <string name="minutes_format">%1$d Menit</string>
+    <string name="turn_off_sleep_timer">Matikan Sleep Timer</string>
+    <string name="sleep_timer_active">Sleep timer: %1$02d:%2$02d</string>
+    <string name="close">Tutup</string>
+    <string name="cancel">Batal</string>
+    <string name="save">Simpan</string>
+    <string name="delete">Hapus</string>
+
+    <!-- Equalizer Screen -->
+    <string name="graphic_equalizer">EQUALIZER GRAFIS</string>
+    <string name="status_active">AKTIF</string>
+    <string name="status_inactive">NONAKTIF</string>
+    <string name="current_preset">Preset saat ini: %1$s</string>
+    <string name="frequency_response_curve">Kurva Respon Frekuensi (dB)</string>
+    <string name="sound_presets">Preset Suara</string>
+    <string name="frequency_bands">Pita Frekuensi (Graphic Bands)</string>
+    <string name="bass_boost">Bass Boost</string>
+    <string name="surround_3d">3D Surround</string>
+    <string name="acoustic_reverb">Profil Reverb Ruang Akustik</string>
+
+    <!-- Streaming Screen -->
+    <string name="streaming_hero_title">Stasiun Radio Pihak Ketiga</string>
+    <string name="streaming_hero_subtitle">Siaran langsung 24/7 tanpa buffer, bebas iklan mengganggu.</string>
+    <string name="curated_stations">Saluran Terkurasi (%1$d)</string>
+    <string name="add_radio_url">Tambah URL Radio</string>
+    <string name="station_name_label">Nama Stasiun</string>
+    <string name="station_genre_label">Genre / Kategori</string>
+    <string name="stream_url_label">URL Streaming (HTTP/HTTPS / Icecast)</string>
+    <string name="save_station">Simpan Stasiun</string>
+
+    <!-- Cloud Screen -->
+    <string name="cloud_hero_title">Putar Langsung dari Cloud</string>
+    <string name="cloud_hero_subtitle">Google Cloud, Nextcloud, WebDAV, atau link audio HTTP langsung.</string>
+    <string name="cloud_saved_tracks">Tersimpan di Cloud (%1$d)</string>
+    <string name="add_cloud_url">Tambah URL Cloud</string>
+    <string name="track_title_label">Judul Lagu</string>
+    <string name="artist_label">Artis / Produser</string>
+    <string name="cloud_provider_label">Penyedia Cloud</string>
+    <string name="audio_format_label">Format File Audio</string>
+    <string name="supported_cloud_presets">Preset Layanan Cloud yang Didukung</string>
+
+    <!-- Playlists Screen -->
+    <string name="playlists_hero_title">Kelola Playlist Lokal &amp; Cloud</string>
+    <string name="playlists_hero_subtitle">Atur, simpan, dan kelola trek audio Anda dalam database SQLite lokal yang aman.</string>
+    <string name="playlists_list_title">Daftar Playlist (%1$d)</string>
+    <string name="create_new_playlist">Buat Playlist Baru</string>
+    <string name="playlist_name_label">Nama Playlist</string>
+    <string name="playlist_desc_label">Deskripsi Playlist (Opsional)</string>
+    <string name="playlist_type_label">Kategori Media Playlist:</string>
+    <string name="play_all">Putar Semua</string>
+    <string name="shuffle">Acak</string>
+    <string name="add_to_playlist">Tambahkan ke Playlist</string>
+    <string name="delete_playlist_confirm">Hapus Playlist?</string>
+    <string name="empty_playlist_title">Playlist Ini Masih Kosong</string>
+    <string name="empty_playlist_desc">Buka tab Library, Streaming, atau Cloud, lalu pilih menu pada lagu untuk menambahkannya ke playlist ini.</string>
+
+    <!-- AI & Smart Playlist Features -->
+    <string name="ai_smart_hub">AI Smart Hub</string>
+    <string name="ai_hub_subtitle">Playlist cerdas, statistik pemutaran &amp; rekomendasi dinamis</string>
+    <string name="most_played_title">Paling Sering Diputar</string>
+    <string name="most_played_desc">Lagu yang paling sering Anda dengarkan berdasarkan riwayat pemutaran</string>
+    <string name="smart_mixes_title">Smart Playlist &amp; Mix AI</string>
+    <string name="ai_genre_recs">Rekomendasi AI &amp; Smart DJ</string>
+    <string name="generate_ai_playlist">Buat Mix AI</string>
+    <string name="plays_count_format">%1$d kali diputar</string>
+    <string name="play_smart_mix">Putar Mix</string>
+
+    <!-- Cinematic Lightning & Aura -->
+    <string name="cinematic_glow">Pencahayaan Sinematik</string>
+    <string name="dynamic_aura_active">Aura Dinamis Aktif</string>
+</resources>

@@ -1,0 +1,8 @@
+{
+  "name": "SoundPulse",
+  "description": "Pemutar audio modern dengan dukungan multi-format (MP3, FLAC, WAV, AAC, OGG), efek equalizer grafis & bass boost, pemutaran folder lokal, cloud storage streaming, dan integrasi radio pihak ketiga.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,99 @@
+<resources>
+    <string name="app_name">SoundPulse</string>
+    <string name="app_subtitle">Audio Player • Room DB • Hi-Res</string>
+
+    <!-- Navigation Tabs -->
+    <string name="tab_library">Library</string>
+    <string name="tab_playlists">Playlists</string>
+    <string name="tab_ai_hub">AI DJ</string>
+    <string name="tab_streaming">Streaming</string>
+    <string name="tab_cloud">Cloud</string>
+    <string name="tab_equalizer">Equalizer</string>
+
+    <!-- Library Screen -->
+    <string name="search_placeholder">Search tracks, artists, or albums…</string>
+    <string name="scan_folder">Scan Folder</string>
+    <string name="import_audio_files">Import Audio Files</string>
+    <string name="all_formats">All Formats</string>
+    <string name="tracks_count">%1$d Audio Tracks</string>
+    <string name="hires_lossless_count">%1$d Hi-Res Lossless</string>
+    <string name="no_tracks_found">No matching tracks found</string>
+    <string name="library_empty_hint">Use the buttons above to scan a folder or import audio files from device storage.</string>
+
+    <!-- Player Screen -->
+    <string name="collapse_player">Collapse Player</string>
+    <string name="track_info">Track Info</string>
+    <string name="speed">Speed</string>
+    <string name="normal_speed">Normal</string>
+    <string name="set_sleep_timer">Set Sleep Timer</string>
+    <string name="minutes_format">%1$d Minutes</string>
+    <string name="turn_off_sleep_timer">Disable Sleep Timer</string>
+    <string name="sleep_timer_active">Sleep timer: %1$02d:%2$02d</string>
+    <string name="close">Close</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+
+    <!-- Equalizer Screen -->
+    <string name="graphic_equalizer">GRAPHIC EQUALIZER</string>
+    <string name="status_active">ACTIVE</string>
+    <string name="status_inactive">OFF</string>
+    <string name="current_preset">Current preset: %1$s</string>
+    <string name="frequency_response_curve">Frequency Response Curve (dB)</string>
+    <string name="sound_presets">Sound Presets</string>
+    <string name="frequency_bands">Graphic Frequency Bands</string>
+    <string name="bass_boost">Bass Boost</string>
+    <string name="surround_3d">3D Surround</string>
+    <string name="acoustic_reverb">Acoustic Reverb Profiles</string>
+
+    <!-- Streaming Screen -->
+    <string name="streaming_hero_title">Third-Party Radio Stations</string>
+    <string name="streaming_hero_subtitle">Live 24/7 broadcasts with high-fidelity streams.</string>
+    <string name="curated_stations">Curated Channels (%1$d)</string>
+    <string name="add_radio_url">Add Radio URL</string>
+    <string name="station_name_label">Station Name</string>
+    <string name="station_genre_label">Genre / Category</string>
+    <string name="stream_url_label">Streaming URL (HTTP/HTTPS / Icecast)</string>
+    <string name="save_station">Save Station</string>
+
+    <!-- Cloud Screen -->
+    <string name="cloud_hero_title">Stream Directly from Cloud</string>
+    <string name="cloud_hero_subtitle">Google Cloud Storage, Internet Archive, Nextcloud, or direct links.</string>
+    <string name="cloud_saved_tracks">Saved in Cloud (%1$d)</string>
+    <string name="add_cloud_url">Add Cloud URL</string>
+    <string name="track_title_label">Track Title</string>
+    <string name="artist_label">Artist / Producer</string>
+    <string name="cloud_provider_label">Cloud Provider</string>
+    <string name="audio_format_label">Audio Container Format</string>
+    <string name="supported_cloud_presets">Supported Cloud Storage Presets</string>
+
+    <!-- Playlists Screen -->
+    <string name="playlists_hero_title">Local &amp; Cloud Playlists</string>
+    <string name="playlists_hero_subtitle">Organize, save, and curate your audio tracks in local Room database.</string>
+    <string name="playlists_list_title">Playlist List (%1$d)</string>
+    <string name="create_new_playlist">New Playlist</string>
+    <string name="playlist_name_label">Playlist Name</string>
+    <string name="playlist_desc_label">Description (Optional)</string>
+    <string name="playlist_type_label">Media Category:</string>
+    <string name="play_all">Play All</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="add_to_playlist">Add to Playlist</string>
+    <string name="delete_playlist_confirm">Delete Playlist?</string>
+    <string name="empty_playlist_title">This Playlist is Empty</string>
+    <string name="empty_playlist_desc">Open Library, Streaming, or Cloud, then tap the menu on a track to add it here.</string>
+
+    <!-- AI & Smart Playlist Features -->
+    <string name="ai_smart_hub">AI Smart Hub</string>
+    <string name="ai_hub_subtitle">Intelligent playlists, listening stats &amp; dynamic recommendations</string>
+    <string name="most_played_title">Most Played Tracks</string>
+    <string name="most_played_desc">Your most frequently played songs based on listening habits</string>
+    <string name="smart_mixes_title">AI Smart Playlists &amp; Mixes</string>
+    <string name="ai_genre_recs">Smart Recommendations &amp; DJ</string>
+    <string name="generate_ai_playlist">Generate AI Mix</string>
+    <string name="plays_count_format">%1$d plays</string>
+    <string name="play_smart_mix">Play Mix</string>
+
+    <!-- Cinematic Lightning & Aura -->
+    <string name="cinematic_glow">Cinematic Lighting</string>
+    <string name="dynamic_aura_active">Dynamic Aura Active</string>
+</resources>
