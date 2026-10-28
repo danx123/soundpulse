@@ -5,6 +5,11 @@
 SoundPulse is an Android music player that combines multi-format local playback, a graphic equalizer with bass boost, cloud storage streaming, and third-party radio, all powered by a Gemini AI integration.
 
 ---
+## Screenshot
+
+<img width="720" height="1600" alt="Screenshot_2026-10-28-23-59-30-34" src="https://github.com/user-attachments/assets/a6ef946e-6172-499a-b9a0-4673ba16edbf" />
+
+<img width="720" height="1600" alt="Screenshot_2026-10-28-23-48-17-51" src="https://github.com/user-attachments/assets/5245ea31-46f6-44e9-a6cc-e275a7209abf" />
 
 ## ✨ Features
 
