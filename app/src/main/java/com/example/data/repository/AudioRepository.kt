@@ -282,7 +282,7 @@ class AudioRepository(private val context: Context) {
         )
     }
 
-    suspend fun importLocalUris(uris: List<Uri>): Int = withContext(Dispatchers.IO) {
+    suspend fun importLocalUrisAndReturn(uris: List<Uri>): List<AudioTrack> = withContext(Dispatchers.IO) {
         val newTracks = mutableListOf<AudioTrack>()
         val mmr = MediaMetadataRetriever()
 
@@ -356,10 +356,26 @@ class AudioRepository(private val context: Context) {
             _tracks.value = newTracks + _tracks.value
         }
 
-        newTracks.size
+        newTracks
     }
 
-    suspend fun scanFolderTree(treeUri: Uri): Int = withContext(Dispatchers.IO) {
+    suspend fun importLocalUris(uris: List<Uri>): Int {
+        return importLocalUrisAndReturn(uris).size
+    }
+
+    fun extractFolderName(treeUri: Uri): String {
+        try {
+            val docId = DocumentsContract.getTreeDocumentId(treeUri)
+            val clean = docId.substringAfterLast(':').substringAfterLast('/')
+            if (clean.isNotBlank()) return clean
+        } catch (e: Exception) {
+            // ignore
+        }
+        return treeUri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/') ?: "Folder Musik"
+    }
+
+    suspend fun loadFolderTracks(treeUri: Uri): Pair<String, List<AudioTrack>> = withContext(Dispatchers.IO) {
+        val folderName = extractFolderName(treeUri)
         val discoveredUris = mutableListOf<Uri>()
         try {
             val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
@@ -402,11 +418,17 @@ class AudioRepository(private val context: Context) {
             Log.e(TAG, "Error scanning folder tree $treeUri", e)
         }
 
-        if (discoveredUris.isNotEmpty()) {
-            importLocalUris(discoveredUris)
+        val loadedTracks = if (discoveredUris.isNotEmpty()) {
+            importLocalUrisAndReturn(discoveredUris)
         } else {
-            0
+            emptyList()
         }
+
+        Pair(folderName, loadedTracks)
+    }
+
+    suspend fun scanFolderTree(treeUri: Uri): Int {
+        return loadFolderTracks(treeUri).second.size
     }
 
     /**

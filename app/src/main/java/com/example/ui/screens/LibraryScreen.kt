@@ -103,6 +103,7 @@ fun LibraryScreen(
     onTrackSelect: (AudioTrack) -> Unit,
     onImportLocalFiles: (List<Uri>) -> Unit,
     onScanFolder: (Uri) -> Unit,
+    onPlayFromFolder: (Uri) -> Unit = {},
     onShowTrackDetails: (AudioTrack) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onAddToPlaylist: (AudioTrack) -> Unit,
@@ -122,6 +123,15 @@ fun LibraryScreen(
     ) { isGranted ->
         if (isGranted) {
             onScanMediaStore()
+        }
+    }
+
+    // Open Document Tree launcher specifically for Play from Folder + Add to Playlist
+    val playFolderPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            onPlayFromFolder(uri)
         }
     }
 
@@ -192,6 +202,40 @@ fun LibraryScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        // Action 1: Highlighted "Putar dari Folder" Button
+        Button(
+            onClick = { playFolderPicker.launch(null) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .testTag("play_from_folder_btn"),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = NeonCyan,
+                contentColor = DarkBg
+            ),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.FolderOpen,
+                contentDescription = null,
+                modifier = Modifier.size(19.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = null,
+                modifier = Modifier.size(19.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = stringResource(R.string.play_from_folder),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
         // Action Buttons Row: Pindai Folder & Impor File
         Row(
             modifier = Modifier
@@ -217,7 +261,7 @@ fun LibraryScreen(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Pindai Folder", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.scan_folder), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
 
             Button(
@@ -245,7 +289,7 @@ fun LibraryScreen(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Impor File Audio", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.import_audio_files), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
         }
 

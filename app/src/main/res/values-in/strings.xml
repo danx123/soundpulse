@@ -101,8 +101,16 @@
     <string name="about">Tentang</string>
     <string name="about_title">Tentang SoundPulse</string>
     <string name="about_tagline">Mesin Audio Audiophile &amp; Kecerdasan Buatan Generasi Baru</string>
-    <string name="about_version">v1.0.0 Pro Studio Edition</string>
+    <string name="about_version">v1.1.0 Pro Studio Edition</string>
     <string name="scan_device_audio">Pindai Lagu Perangkat (Android 9+)</string>
+    <string name="play_from_folder">Putar dari Folder</string>
+    <string name="folder_loaded_title">Folder Dimuat (%1$d Lagu)</string>
+    <string name="add_folder_to_playlist_prompt">Tambahkan semua lagu dari folder ini ke playlist?</string>
+    <string name="add_to_existing_playlist">Pilih Playlist yang Ada</string>
+    <string name="create_new_playlist_for_folder">Buat Playlist Baru</string>
+    <string name="folder_playlist_prefix">Folder: %1$s</string>
+    <string name="playback_channel_name">Pemutaran Audio SoundPulse</string>
+    <string name="playback_channel_desc">Menampilkan kontrol pemutaran di bilah notifikasi dan layar kunci</string>
     <string name="about_description">SoundPulse adalah pemutar audio pintar generasi modern yang dirancang khusus untuk para penikmat musik dan audiophile sejati. Dilengkapi dukungan format audio luas (FLAC, MP3, WAV, AAC, OGG, Opus), teknologi Cinematic Lighting dengan ambient artwork blur, Dynamic Aura yang menyesuaikan warna kontrol dengan artwork album secara real-time, 5-Band Studio Equalizer dengan Bass Boost &amp; 3D Reverb, pemutar folder lokal &amp; cloud storage, kurasi cerdas AI Smart Playlist, serta kompatibilitas penuh dari Android 9.0 Pie (API 28) hingga versi terbaru.</string>
     <string name="about_highlights_title">Fitur Unggulan</string>
     <string name="about_feat_cinematic">Cinematic Lighting &amp; Dynamic Aura</string>

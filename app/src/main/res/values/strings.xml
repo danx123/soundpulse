@@ -101,8 +101,16 @@
     <string name="about">About</string>
     <string name="about_title">About SoundPulse</string>
     <string name="about_tagline">Next-Gen Audiophile &amp; AI-Driven Sound Engine</string>
-    <string name="about_version">v1.0.0 Pro Studio Edition</string>
+    <string name="about_version">v1.1.0 Pro Studio Edition</string>
     <string name="scan_device_audio">Scan Device Audio (Android 9+)</string>
+    <string name="play_from_folder">Play from Folder</string>
+    <string name="folder_loaded_title">Folder Loaded (%1$d Tracks)</string>
+    <string name="add_folder_to_playlist_prompt">Add all tracks from this folder to a playlist?</string>
+    <string name="add_to_existing_playlist">Add to Existing Playlist</string>
+    <string name="create_new_playlist_for_folder">Create New Playlist</string>
+    <string name="folder_playlist_prefix">Folder: %1$s</string>
+    <string name="playback_channel_name">SoundPulse Audio Playback</string>
+    <string name="playback_channel_desc">Shows now playing controls on notification bar and lockscreen</string>
     <string name="about_description">SoundPulse is a next-generation smart audio player engineered for true music enthusiasts and audiophiles. Features ultra-wide audio format decoding (FLAC, MP3, WAV, AAC, OGG, Opus), real-time Cinematic Lighting with dynamic album blur, Dynamic Aura that shifts UI controls to match album art colors, 5-Band Studio Equalizer, Cloud &amp; Local Folder storage playback, AI Smart Playlists, and full backwards compatibility for Android 9.0 Pie (API 28) and newer.</string>
     <string name="about_highlights_title">Core Highlights</string>
     <string name="about_feat_cinematic">Cinematic Lighting &amp; Dynamic Aura</string>

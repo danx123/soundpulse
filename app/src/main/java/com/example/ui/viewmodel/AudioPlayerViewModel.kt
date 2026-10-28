@@ -22,6 +22,8 @@ import com.example.data.model.StreamingStation
 import com.example.data.repository.AiMusicRecommender
 import com.example.data.repository.AudioRepository
 import com.example.data.repository.PlaylistRepository
+import com.example.service.AudioPlaybackService
+import com.example.service.AudioPlayerBridge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -153,9 +155,42 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
         aiRecommender.generateRecommendations(tracks, stats)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Folder loaded state for Play from Folder and Add to Playlist prompt
+    data class FolderLoadedState(
+        val folderName: String,
+        val tracks: List<AudioTrack>
+    )
+
+    private val _folderLoadedState = MutableStateFlow<FolderLoadedState?>(null)
+    val folderLoadedState: StateFlow<FolderLoadedState?> = _folderLoadedState.asStateFlow()
+
     init {
         engine.setOnTrackCompletedListener {
             playNextTrack()
+        }
+
+        // Connect media controls bridge for lockscreen, notification shade, and bluetooth
+        AudioPlayerBridge.onPlayPause = { togglePlayPause() }
+        AudioPlayerBridge.onPlay = { if (!isPlaying.value) togglePlayPause() }
+        AudioPlayerBridge.onPause = { if (isPlaying.value) togglePlayPause() }
+        AudioPlayerBridge.onNext = { playNextTrack() }
+        AudioPlayerBridge.onPrev = { playPreviousTrack() }
+        AudioPlayerBridge.onSeekTo = { seekTo(it) }
+        AudioPlayerBridge.onStop = { engine.pause() }
+
+        // Keep foreground notification & lockscreen media controls in sync with engine
+        viewModelScope.launch {
+            combine(engine.currentTrack, engine.isPlaying) { track, playing ->
+                Pair(track, playing)
+            }.collect { (track, playing) ->
+                AudioPlaybackService.startOrUpdate(
+                    getApplication<Application>().applicationContext,
+                    track = track,
+                    isPlaying = playing,
+                    positionMs = engine.currentPositionMs.value,
+                    durationMs = engine.durationMs.value
+                )
+            }
         }
 
         // Ensure database has default playlists and initial stats if newly created
@@ -422,6 +457,47 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    fun playFromFolder(treeUri: Uri) {
+        viewModelScope.launch {
+            val (folderName, tracks) = repository.loadFolderTracks(treeUri)
+            if (tracks.isNotEmpty()) {
+                playTrack(tracks.first(), tracks)
+                _folderLoadedState.value = FolderLoadedState(folderName, tracks)
+                _userMessage.value = "Memutar ${tracks.size} lagu dari folder '$folderName'"
+            } else {
+                _userMessage.value = "Tidak ditemukan file audio di folder tersebut"
+            }
+        }
+    }
+
+    fun addFolderToNewPlaylist(name: String, tracks: List<AudioTrack>) {
+        viewModelScope.launch {
+            val playlistId = playlistRepository.createPlaylist(name, "Diimpor dari folder", PlaylistType.LOCAL)
+            tracks.forEach { track ->
+                playlistRepository.addTrackToPlaylist(playlistId, track)
+            }
+            _userMessage.value = "${tracks.size} lagu ditambahkan ke playlist baru '$name'"
+            _folderLoadedState.value = null
+        }
+    }
+
+    fun addFolderToExistingPlaylist(playlistId: Long, playlistName: String, tracks: List<AudioTrack>) {
+        viewModelScope.launch {
+            var count = 0
+            tracks.forEach { track ->
+                if (playlistRepository.addTrackToPlaylist(playlistId, track)) {
+                    count++
+                }
+            }
+            _userMessage.value = "$count lagu berhasil ditambahkan ke '$playlistName'"
+            _folderLoadedState.value = null
+        }
+    }
+
+    fun dismissFolderLoadedDialog() {
+        _folderLoadedState.value = null
+    }
+
     fun scanFolderTree(treeUri: Uri) {
         viewModelScope.launch {
             val count = repository.scanFolderTree(treeUri)
@@ -460,6 +536,14 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     override fun onCleared() {
         super.onCleared()
+        AudioPlayerBridge.onPlayPause = null
+        AudioPlayerBridge.onPlay = null
+        AudioPlayerBridge.onPause = null
+        AudioPlayerBridge.onNext = null
+        AudioPlayerBridge.onPrev = null
+        AudioPlayerBridge.onSeekTo = null
+        AudioPlayerBridge.onStop = null
+        AudioPlaybackService.stop(getApplication<Application>().applicationContext)
         sleepTimerJob?.cancel()
         engine.release()
     }
