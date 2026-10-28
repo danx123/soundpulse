@@ -96,4 +96,20 @@
     <!-- Cinematic Lightning & Aura -->
     <string name="cinematic_glow">Cinematic Lighting</string>
     <string name="dynamic_aura_active">Dynamic Aura Active</string>
+
+    <!-- About Dialog & Footer -->
+    <string name="about">About</string>
+    <string name="about_title">About SoundPulse</string>
+    <string name="about_tagline">Next-Gen Audiophile &amp; AI-Driven Sound Engine</string>
+    <string name="about_version">v1.0.0 Pro Studio Edition</string>
+    <string name="about_description">SoundPulse is a next-generation smart audio player engineered for true music enthusiasts and audiophiles. Features ultra-wide audio format decoding (FLAC, MP3, WAV, AAC, OGG, Opus), real-time Cinematic Lighting with dynamic album blur, Dynamic Aura that shifts UI controls to match album art colors, 5-Band Studio Equalizer, Cloud &amp; Local Folder storage playback, and AI Smart Playlists.</string>
+    <string name="about_highlights_title">Core Highlights</string>
+    <string name="about_feat_cinematic">Cinematic Lighting &amp; Dynamic Aura</string>
+    <string name="about_feat_hires">Lossless Studio Audio (Up to 96kHz / 24-bit)</string>
+    <string name="about_feat_cloud">Cloud Storage (GCS/Drive) &amp; Local Folders</string>
+    <string name="about_feat_equalizer">5-Band Studio EQ, Bass Boost &amp; 3D Reverb</string>
+    <string name="about_feat_ai">AI Smart DJ &amp; Most Played Playlists</string>
+    <string name="about_footer_brand">Macan Angkasa</string>
+    <string name="about_footer_by">Crafted with passion by</string>
+    <string name="about_copyright">© 2026 Macan Angkasa. All rights reserved.</string>
 </resources>

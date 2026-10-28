@@ -32,8 +32,10 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -49,7 +51,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -61,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ui.components.AboutDialog
 import com.example.ui.components.AddToPlaylistDialog
 import com.example.ui.components.MiniPlayer
 import com.example.ui.components.NowPlayingScreen
@@ -132,6 +137,8 @@ fun SoundPulseApp(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val formatFilter by viewModel.formatFilter.collectAsState()
 
+    var showAboutDialog by remember { mutableStateOf(false) }
+
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(userMessage) {
@@ -189,6 +196,18 @@ fun SoundPulseApp(
                                     color = NeonCyan
                                 )
                             }
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { showAboutDialog = true },
+                            modifier = Modifier.testTag("about_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Info,
+                                contentDescription = stringResource(R.string.about),
+                                tint = NeonCyan
+                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -371,7 +390,8 @@ fun SoundPulseApp(
                     onScanFolder = { uri -> viewModel.scanFolderTree(uri) },
                     onShowTrackDetails = { track -> viewModel.showTrackDetails(track) },
                     onToggleFavorite = { id -> viewModel.toggleFavorite(id) },
-                    onAddToPlaylist = { track -> viewModel.openAddToPlaylistDialog(track) }
+                    onAddToPlaylist = { track -> viewModel.openAddToPlaylistDialog(track) },
+                    onAboutClick = { showAboutDialog = true }
                 )
 
                 MainTab.PLAYLISTS -> PlaylistScreen(
@@ -392,7 +412,8 @@ fun SoundPulseApp(
                     isPlaying = isPlaying,
                     onPlaySmartPlaylist = { p -> viewModel.playSmartPlaylist(p) },
                     onPlayTrack = { track -> viewModel.playTrack(track) },
-                    onGenerateCustomAiMix = { prompt -> viewModel.generateCustomAiMix(prompt) }
+                    onGenerateCustomAiMix = { prompt -> viewModel.generateCustomAiMix(prompt) },
+                    onAboutClick = { showAboutDialog = true }
                 )
 
                 MainTab.STREAMING -> StreamingScreen(
@@ -509,6 +530,13 @@ fun SoundPulseApp(
         TrackDetailsDialog(
             track = track,
             onDismiss = { viewModel.showTrackDetails(null) }
+        )
+    }
+
+    // About SoundPulse & Macan Angkasa Modal
+    if (showAboutDialog) {
+        AboutDialog(
+            onDismiss = { showAboutDialog = false }
         )
     }
 }

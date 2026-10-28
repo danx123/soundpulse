@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.AudioFormat
 import com.example.data.model.AudioSourceType
 import com.example.data.model.AudioTrack
+import com.example.ui.components.AppFooterCard
 import com.example.ui.components.FormatBadge
 import com.example.ui.components.formatTime
 import com.example.ui.theme.DarkBg
@@ -97,6 +98,7 @@ fun LibraryScreen(
     onShowTrackDetails: (AudioTrack) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onAddToPlaylist: (AudioTrack) -> Unit,
+    onAboutClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Open Document Tree launcher for folder scanning
@@ -313,6 +315,8 @@ fun LibraryScreen(
                         color = TextSecondary,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    AppFooterCard(onAboutClick = onAboutClick)
                 }
             }
         } else {
@@ -332,6 +336,10 @@ fun LibraryScreen(
                         onToggleFavorite = { onToggleFavorite(track.id) },
                         onAddToPlaylist = { onAddToPlaylist(track) }
                     )
+                }
+
+                item {
+                    AppFooterCard(onAboutClick = onAboutClick)
                 }
             }
         }

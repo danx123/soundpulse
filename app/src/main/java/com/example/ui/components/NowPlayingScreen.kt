@@ -693,7 +693,18 @@ fun NowPlayingScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = stringResource(R.string.about_footer_brand),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        letterSpacing = 2.5.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    ),
+                    color = TextMuted.copy(alpha = 0.5f)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
     }

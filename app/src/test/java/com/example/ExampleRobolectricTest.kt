@@ -52,6 +52,12 @@ class ExampleRobolectricTest {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val appName = context.getString(R.string.app_name)
     assertEquals("SoundPulse", appName)
+
+    val footerBrand = context.getString(R.string.about_footer_brand)
+    assertEquals("Macan Angkasa", footerBrand)
+
+    val aboutTitle = context.getString(R.string.about_title)
+    assertTrue(aboutTitle.isNotEmpty())
   }
 
   @Test

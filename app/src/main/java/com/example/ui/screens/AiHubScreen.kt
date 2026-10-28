@@ -60,6 +60,7 @@ import com.example.data.local.entity.TrackStatEntity
 import com.example.data.model.AiMusicRecommendation
 import com.example.data.model.AudioTrack
 import com.example.data.model.SmartPlaylist
+import com.example.ui.components.AppFooterCard
 import com.example.ui.components.FormatBadge
 import com.example.ui.components.formatTime
 import com.example.ui.theme.DarkBg
@@ -86,6 +87,7 @@ fun AiHubScreen(
     onPlaySmartPlaylist: (SmartPlaylist) -> Unit,
     onPlayTrack: (AudioTrack) -> Unit,
     onGenerateCustomAiMix: (prompt: String) -> Unit,
+    onAboutClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var customPrompt by remember { mutableStateOf("") }
@@ -327,6 +329,13 @@ fun AiHubScreen(
                         )
                     }
                 }
+            }
+        }
+
+        // App Footer with Macan Angkasa branding & About modal trigger
+        item {
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                AppFooterCard(onAboutClick = onAboutClick)
             }
         }
     }
