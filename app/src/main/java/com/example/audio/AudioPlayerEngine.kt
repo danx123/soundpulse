@@ -30,6 +30,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 private const val TAG = "SoundPulseEngine"
+private const val REVERB_SEND_LEVEL = 0.8f
 
 enum class RepeatMode {
     OFF, ALL, ONE
@@ -44,6 +45,7 @@ class AudioPlayerEngine(
     private var hardwareBassBoost: BassBoost? = null
     private var hardwareVirtualizer: Virtualizer? = null
     private var hardwareReverb: PresetReverb? = null
+    private var reverbPlayer: MediaPlayer? = null
 
     private val visualizerSimulator = VisualizerSimulator()
 
@@ -167,7 +169,7 @@ class AudioPlayerEngine(
                         scope.launch(Dispatchers.Main) {
                             _isBuffering.value = false
                             _durationMs.value = if (mp.duration > 0) mp.duration.toLong() else track.durationMs
-                            setupAudioEffects(mp.audioSessionId)
+                            setupAudioEffects(mp.audioSessionId, mp)
                             setupVisualizer(mp.audioSessionId)
                             applyPlaybackSpeedInternal(_playbackSpeed.value)
                             mp.start()
@@ -288,7 +290,7 @@ class AudioPlayerEngine(
 
     // --- Audio Effects & Equalizer ---
 
-    private fun setupAudioEffects(audioSessionId: Int) {
+    private fun setupAudioEffects(audioSessionId: Int, player: MediaPlayer? = null) {
         if (audioSessionId == 0) return
 
         try {
@@ -350,6 +352,9 @@ class AudioPlayerEngine(
                 Log.w(TAG, "Virtualizer not supported", e)
             }
 
+            // PresetReverb (auxiliary effect)
+            setupReverb(player)
+
         } catch (e: Exception) {
             Log.w(TAG, "Failed to setup hardware audio effects, using simulated equalizer", e)
         }
@@ -375,6 +380,7 @@ class AudioPlayerEngine(
         } catch (e: Exception) {
             Log.w(TAG, "Error enabling/disabling audiofx", e)
         }
+        applyReverbToHardware()
     }
 
     fun setBandLevel(bandIndex: Int, levelMillibels: Int) {
@@ -420,6 +426,7 @@ class AudioPlayerEngine(
             reverbEffect = preset.reverb
         )
         persistEqualizer()
+        applyReverbToHardware()
     }
 
     fun setBassBoostStrength(strength: Int) {
@@ -451,6 +458,7 @@ class AudioPlayerEngine(
     fun setReverb(reverbName: String) {
         _equalizerState.value = _equalizerState.value.copy(reverbEffect = reverbName)
         persistEqualizer()
+        applyReverbToHardware()
     }
 
     fun clearError() {
@@ -470,6 +478,7 @@ class AudioPlayerEngine(
             hardwareBassBoost = null
             hardwareVirtualizer = null
             hardwareReverb = null
+            reverbPlayer = null
         }
     }
 
@@ -491,6 +500,51 @@ class AudioPlayerEngine(
         saveEqJob?.cancel()
         equalizerStore.save(_equalizerState.value)
         releaseMediaPlayer()
+    }
+
+    // --- Reverb (PresetReverb sebagai auxiliary effect) ---
+
+    private fun reverbPresetFor(name: String): Short? = when (name.trim().lowercase()) {
+        "small room" -> PresetReverb.PRESET_SMALLROOM
+        "medium room" -> PresetReverb.PRESET_MEDIUMROOM
+        "large room" -> PresetReverb.PRESET_LARGEROOM
+        "hall", "medium hall" -> PresetReverb.PRESET_MEDIUMHALL
+        "large hall" -> PresetReverb.PRESET_LARGEHALL
+        "plate" -> PresetReverb.PRESET_PLATE
+        else -> null // "None"
+    }
+
+    /**
+     * Reverb di Android sebaiknya dipasang sebagai auxiliary effect:
+     * dibuat di session 0 lalu di-attach ke MediaPlayer dengan send level.
+     */
+    private fun setupReverb(player: MediaPlayer?) {
+        if (player == null) return
+        try {
+            val reverb = PresetReverb(0, 0)
+            hardwareReverb = reverb
+            reverbPlayer = player
+            player.attachAuxEffect(reverb.id)
+            applyReverbToHardware()
+        } catch (e: Exception) {
+            Log.w(TAG, "PresetReverb tidak didukung di perangkat ini", e)
+            hardwareReverb = null
+            reverbPlayer = null
+        }
+    }
+
+    private fun applyReverbToHardware() {
+        val reverb = hardwareReverb ?: return
+        val state = _equalizerState.value
+        val preset = reverbPresetFor(state.reverbEffect)
+        val active = state.isEnabled && preset != null
+        try {
+            reverb.preset = preset ?: PresetReverb.PRESET_NONE
+            reverb.enabled = active
+            reverbPlayer?.setAuxEffectSendLevel(if (active) REVERB_SEND_LEVEL else 0f)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error menerapkan reverb", e)
+        }
     }
 
     // --- Persistensi equalizer ---
