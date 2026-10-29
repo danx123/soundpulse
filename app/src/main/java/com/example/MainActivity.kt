@@ -1,9 +1,13 @@
 package com.example
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -33,6 +37,7 @@ import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +50,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -53,16 +59,19 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.AboutDialog
@@ -140,6 +149,25 @@ fun SoundPulseApp(
     val folderLoadedState by viewModel.folderLoadedState.collectAsState()
 
     var showAboutDialog by remember { mutableStateOf(false) }
+
+    // Izin RECORD_AUDIO dibutuhkan Visualizer agar bar mengikuti beat (audio tidak direkam)
+    val appContext = LocalContext.current
+    var showVisualizerPermissionDialog by remember { mutableStateOf(false) }
+    var visualizerPermissionAsked by rememberSaveable { mutableStateOf(false) }
+    val recordAudioLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) viewModel.engine.onVisualizerPermissionGranted()
+    }
+    LaunchedEffect(currentTrack?.id) {
+        if (currentTrack != null && !visualizerPermissionAsked &&
+            ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            visualizerPermissionAsked = true
+            showVisualizerPermissionDialog = true
+        }
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -548,6 +576,36 @@ fun SoundPulseApp(
         TrackDetailsDialog(
             track = track,
             onDismiss = { viewModel.showTrackDetails(null) }
+        )
+    }
+
+    // Penjelasan izin untuk visualizer beat
+    if (showVisualizerPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showVisualizerPermissionDialog = false },
+            title = { Text("Aktifkan Visualizer Beat", color = TextPrimary) },
+            text = {
+                Text(
+                    text = "Agar visualizer bergerak mengikuti beat lagu, Android mewajibkan izin Mikrofon. " +
+                        "SoundPulse hanya membaca spektrum audio yang sedang diputar dan tidak merekam suara apa pun. " +
+                        "Tanpa izin ini, visualizer memakai animasi simulasi.",
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showVisualizerPermissionDialog = false
+                    recordAudioLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }) {
+                    Text("Izinkan", color = NeonCyan)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVisualizerPermissionDialog = false }) {
+                    Text("Nanti", color = TextSecondary)
+                }
+            },
+            containerColor = DarkSurface
         )
     }
 

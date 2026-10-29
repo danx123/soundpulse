@@ -1,15 +1,20 @@
 package com.example.audio
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.audiofx.BassBoost
 import android.media.audiofx.Equalizer
 import android.media.audiofx.PresetReverb
 import android.media.audiofx.Virtualizer
+import android.media.audiofx.Visualizer
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import androidx.core.content.ContextCompat
+import com.example.data.local.EqualizerStore
 import com.example.data.model.AudioTrack
 import com.example.data.model.EqualizerBand
 import com.example.data.model.EqualizerPreset
@@ -42,6 +47,18 @@ class AudioPlayerEngine(
 
     private val visualizerSimulator = VisualizerSimulator()
 
+    // Visualizer asli (FFT dari output audio) + pemroses band beat-reactive
+    private val fftProcessor = FftBandProcessor()
+    private var hardwareVisualizer: Visualizer? = null
+    @Volatile private var latestFft: ByteArray? = null
+    @Volatile private var latestFftRate: Int = 44100000
+    private var visualizerActive = false
+    private var currentAudioSessionId = 0
+
+    // Penyimpanan permanen pengaturan equalizer
+    private val equalizerStore = EqualizerStore(context)
+    private var saveEqJob: Job? = null
+
     // State flows
     private val _currentTrack = MutableStateFlow<AudioTrack?>(null)
     val currentTrack: StateFlow<AudioTrack?> = _currentTrack.asStateFlow()
@@ -67,7 +84,7 @@ class AudioPlayerEngine(
     private val _repeatMode = MutableStateFlow(RepeatMode.OFF)
     val repeatMode: StateFlow<RepeatMode> = _repeatMode.asStateFlow()
 
-    private val _equalizerState = MutableStateFlow(EqualizerState())
+    private val _equalizerState = MutableStateFlow(equalizerStore.load())
     val equalizerState: StateFlow<EqualizerState> = _equalizerState.asStateFlow()
 
     private val _visualizerAmplitudes = MutableStateFlow<List<Float>>(emptyList())
@@ -102,18 +119,21 @@ class AudioPlayerEngine(
                         }
                     }
 
-                    // Update visualizer values
-                    val eqBands = _equalizerState.value.bands.map { it.levelMillibels }
-                    _visualizerAmplitudes.value = visualizerSimulator.updateAmplitudes(
-                        isPlaying = _isPlaying.value,
-                        positionMs = _currentPositionMs.value,
-                        bassBoost = _equalizerState.value.bassBoostStrength,
-                        equalizerBands = eqBands
-                    )
+                    // Update visualizer: pakai FFT asli bila tersedia, kalau tidak pakai simulasi
+                    val realFrame = visualizerFrame(_isPlaying.value)
+                    _visualizerAmplitudes.value = realFrame ?: run {
+                        val eqBands = _equalizerState.value.bands.map { it.levelMillibels }
+                        visualizerSimulator.updateAmplitudes(
+                            isPlaying = _isPlaying.value,
+                            positionMs = _currentPositionMs.value,
+                            bassBoost = _equalizerState.value.bassBoostStrength,
+                            equalizerBands = eqBands
+                        )
+                    }
                 } catch (e: Exception) {
                     // Ignore transient playback state exceptions
                 }
-                delay(80) // 12.5 fps updates for smooth waveform
+                delay(40) // ~25 fps agar bar responsif terhadap beat
             }
         }
     }
@@ -148,6 +168,7 @@ class AudioPlayerEngine(
                             _isBuffering.value = false
                             _durationMs.value = if (mp.duration > 0) mp.duration.toLong() else track.durationMs
                             setupAudioEffects(mp.audioSessionId)
+                            setupVisualizer(mp.audioSessionId)
                             applyPlaybackSpeedInternal(_playbackSpeed.value)
                             mp.start()
                             _isPlaying.value = true
@@ -336,8 +357,19 @@ class AudioPlayerEngine(
 
     fun setEqualizerEnabled(enabled: Boolean) {
         _equalizerState.value = _equalizerState.value.copy(isEnabled = enabled)
+        persistEqualizer()
         try {
             hardwareEqualizer?.enabled = enabled
+            // Terapkan ulang level band yang diubah saat EQ nonaktif
+            val eq = hardwareEqualizer
+            if (enabled && eq != null) {
+                val hwBands = eq.numberOfBands.toInt()
+                _equalizerState.value.bands.forEach { band ->
+                    if (band.index < hwBands) {
+                        eq.setBandLevel(band.index.toShort(), band.levelMillibels.toShort())
+                    }
+                }
+            }
             hardwareBassBoost?.enabled = enabled
             hardwareVirtualizer?.enabled = enabled
         } catch (e: Exception) {
@@ -353,6 +385,7 @@ class AudioPlayerEngine(
             bands = updatedBands,
             currentPreset = "Custom"
         )
+        persistEqualizer()
 
         try {
             if (_equalizerState.value.isEnabled) {
@@ -386,11 +419,13 @@ class AudioPlayerEngine(
             virtualizerStrength = preset.virtualizer,
             reverbEffect = preset.reverb
         )
+        persistEqualizer()
     }
 
     fun setBassBoostStrength(strength: Int) {
         val clamped = strength.coerceIn(0, 1000)
         _equalizerState.value = _equalizerState.value.copy(bassBoostStrength = clamped)
+        persistEqualizer()
         try {
             if (hardwareBassBoost?.strengthSupported == true) {
                 hardwareBassBoost?.setStrength(clamped.toShort())
@@ -403,6 +438,7 @@ class AudioPlayerEngine(
     fun setVirtualizerStrength(strength: Int) {
         val clamped = strength.coerceIn(0, 1000)
         _equalizerState.value = _equalizerState.value.copy(virtualizerStrength = clamped)
+        persistEqualizer()
         try {
             if (hardwareVirtualizer?.strengthSupported == true) {
                 hardwareVirtualizer?.setStrength(clamped.toShort())
@@ -414,6 +450,7 @@ class AudioPlayerEngine(
 
     fun setReverb(reverbName: String) {
         _equalizerState.value = _equalizerState.value.copy(reverbEffect = reverbName)
+        persistEqualizer()
     }
 
     fun clearError() {
@@ -438,6 +475,7 @@ class AudioPlayerEngine(
 
     private fun releaseMediaPlayer() {
         try {
+            releaseVisualizer()
             releaseAudioEffects()
             mediaPlayer?.stop()
             mediaPlayer?.release()
@@ -450,6 +488,99 @@ class AudioPlayerEngine(
 
     fun release() {
         tickerJob?.cancel()
+        saveEqJob?.cancel()
+        equalizerStore.save(_equalizerState.value)
         releaseMediaPlayer()
+    }
+
+    // --- Persistensi equalizer ---
+
+    /** Simpan dengan debounce agar drag slider tidak menulis disk berkali-kali. */
+    private fun persistEqualizer() {
+        saveEqJob?.cancel()
+        saveEqJob = scope.launch(Dispatchers.IO) {
+            delay(300)
+            equalizerStore.save(_equalizerState.value)
+        }
+    }
+
+    // --- Visualizer asli (FFT) ---
+
+    /** Dipanggil setelah user memberi izin RECORD_AUDIO saat lagu sedang diputar. */
+    fun onVisualizerPermissionGranted() {
+        setupVisualizer(currentAudioSessionId)
+    }
+
+    @Synchronized
+    private fun setupVisualizer(sessionId: Int) {
+        releaseVisualizer()
+        currentAudioSessionId = sessionId
+        if (sessionId == 0) return
+
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) return // fallback ke visualizer simulasi
+
+        try {
+            val viz = Visualizer(sessionId)
+            viz.enabled = false
+            viz.captureSize = Visualizer.getCaptureSizeRange()[1]
+            viz.setDataCaptureListener(
+                object : Visualizer.OnDataCaptureListener {
+                    override fun onWaveFormDataCapture(v: Visualizer?, waveform: ByteArray?, samplingRate: Int) {}
+
+                    override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, samplingRate: Int) {
+                        if (fft != null) {
+                            latestFft = fft.copyOf()
+                            latestFftRate = samplingRate
+                        }
+                    }
+                },
+                Visualizer.getMaxCaptureRate(),
+                false,
+                true
+            )
+            hardwareVisualizer = viz
+            visualizerActive = false
+            fftProcessor.reset()
+        } catch (e: Exception) {
+            Log.w(TAG, "Visualizer tidak tersedia, memakai visualizer simulasi", e)
+            hardwareVisualizer = null
+        }
+    }
+
+    /** Mengembalikan amplitudo dari FFT asli, atau null bila visualizer asli tidak aktif. */
+    @Synchronized
+    private fun visualizerFrame(playing: Boolean): List<Float>? {
+        val viz = hardwareVisualizer ?: return null
+        try {
+            if (visualizerActive != playing) {
+                viz.enabled = playing
+                visualizerActive = playing
+                if (!playing) latestFft = null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Visualizer error, fallback ke simulasi", e)
+            releaseVisualizer()
+            return null
+        }
+        return fftProcessor.process(if (playing) latestFft else null, latestFftRate)
+    }
+
+    @Synchronized
+    private fun releaseVisualizer() {
+        try {
+            hardwareVisualizer?.let {
+                it.enabled = false
+                it.release()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error releasing visualizer", e)
+        } finally {
+            hardwareVisualizer = null
+            visualizerActive = false
+            latestFft = null
+        }
     }
 }
