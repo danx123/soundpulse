@@ -335,7 +335,7 @@ fun EqualizerScreen(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
-                val reverbOptions = listOf("None", "Small Room", "Medium Room", "Large Room", "Hall", "Plate")
+                val reverbOptions = listOf("None", "Small Room", "Medium Room", "Large Room", "Hall", "Large Hall", "Plate")
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
