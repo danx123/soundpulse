@@ -77,6 +77,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.AboutDialog
 import com.example.ui.components.AddToPlaylistDialog
 import com.example.ui.components.FolderLoadedPlaylistDialog
+import com.example.ui.components.LyricsScreen
 import com.example.ui.components.MiniPlayer
 import com.example.ui.components.NowPlayingScreen
 import com.example.ui.components.TrackDetailsDialog
@@ -147,6 +148,8 @@ fun SoundPulseApp(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val formatFilter by viewModel.formatFilter.collectAsState()
     val folderLoadedState by viewModel.folderLoadedState.collectAsState()
+    val isLyricsVisible by viewModel.isLyricsVisible.collectAsState()
+    val lyricsState by viewModel.lyricsState.collectAsState()
 
     var showAboutDialog by remember { mutableStateOf(false) }
 
@@ -537,7 +540,27 @@ fun SoundPulseApp(
                 viewModel.setTab(MainTab.EQUALIZER)
             },
             onShowTrackDetails = { track -> viewModel.showTrackDetails(track) },
-            onToggleFavorite = { id -> viewModel.toggleFavorite(id) }
+            onToggleFavorite = { id -> viewModel.toggleFavorite(id) },
+            onOpenLyrics = { viewModel.openLyrics() }
+        )
+    }
+
+    // Lirik layar penuh (di atas Now Playing)
+    AnimatedVisibility(
+        visible = isLyricsVisible,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically()
+    ) {
+        LyricsScreen(
+            track = currentTrack,
+            state = lyricsState,
+            currentPositionMs = currentPositionMs,
+            durationMs = durationMs,
+            isPlaying = isPlaying,
+            onClose = { viewModel.closeLyrics() },
+            onSeekTo = { pos -> viewModel.seekTo(pos) },
+            onTogglePlayPause = { viewModel.togglePlayPause() },
+            onRetry = { viewModel.retryLyrics() }
         )
     }
 
