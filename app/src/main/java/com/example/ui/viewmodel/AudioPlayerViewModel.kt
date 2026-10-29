@@ -17,10 +17,12 @@ import com.example.data.model.AudioSourceType
 import com.example.data.model.AudioTrack
 import com.example.data.model.EqualizerPreset
 import com.example.data.model.EqualizerState
+import com.example.data.model.LyricsUiState
 import com.example.data.model.SmartPlaylist
 import com.example.data.model.StreamingStation
 import com.example.data.repository.AiMusicRecommender
 import com.example.data.repository.AudioRepository
+import com.example.data.repository.LyricsRepository
 import com.example.data.repository.PlaylistRepository
 import com.example.service.AudioPlaybackService
 import com.example.service.AudioPlayerBridge
@@ -31,6 +33,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -164,7 +167,32 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private val _folderLoadedState = MutableStateFlow<FolderLoadedState?>(null)
     val folderLoadedState: StateFlow<FolderLoadedState?> = _folderLoadedState.asStateFlow()
 
+    // Lirik layar penuh
+    private val lyricsRepository = LyricsRepository(application.applicationContext)
+
+    private val _isLyricsVisible = MutableStateFlow(false)
+    val isLyricsVisible: StateFlow<Boolean> = _isLyricsVisible.asStateFlow()
+
+    private val _lyricsState = MutableStateFlow<LyricsUiState>(LyricsUiState.Idle)
+    val lyricsState: StateFlow<LyricsUiState> = _lyricsState.asStateFlow()
+
+    private val lyricsRefreshTick = MutableStateFlow(0)
+    private var forceLyricsRefresh = false
+
     init {
+        // Ambil lirik saat layar lirik terbuka, dan ulangi bila lagu berganti
+        viewModelScope.launch {
+            combine(engine.currentTrack, _isLyricsVisible, lyricsRefreshTick) { track, visible, _ ->
+                if (visible) track else null
+            }.collectLatest { track ->
+                if (track == null) return@collectLatest
+                val force = forceLyricsRefresh
+                forceLyricsRefresh = false
+                _lyricsState.value = LyricsUiState.Loading
+                _lyricsState.value = lyricsRepository.getLyrics(track, force)
+            }
+        }
+
         engine.setOnTrackCompletedListener {
             playNextTrack()
         }
@@ -529,6 +557,19 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun toggleFavorite(trackId: String) {
         repository.toggleFavorite(trackId)
+    }
+
+    fun openLyrics() {
+        _isLyricsVisible.value = true
+    }
+
+    fun closeLyrics() {
+        _isLyricsVisible.value = false
+    }
+
+    fun retryLyrics() {
+        forceLyricsRefresh = true
+        lyricsRefreshTick.value += 1
     }
 
     fun clearUserMessage() {
