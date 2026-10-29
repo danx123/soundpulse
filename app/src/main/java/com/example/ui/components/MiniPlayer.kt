@@ -122,7 +122,8 @@ fun MiniPlayer(
                     TrackArtwork(
                         track = currentTrack,
                         modifier = Modifier.fillMaxSize(),
-                        sizePx = 160
+                        sizePx = 160,
+                        priority = true
                     ) {
                         if (isPlaying) {
                             Icon(
