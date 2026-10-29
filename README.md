@@ -2,7 +2,7 @@
 
 **A modern Android audio player with built-in AI integration.**
 
-SoundPulse is an Android music player that combines multi-format local playback, a graphic equalizer with bass boost, cloud storage streaming, and third-party radio, all powered by a Gemini AI integration.
+SoundPulse is an Android music player that combines multi-format local playback, a graphic equalizer with bass boost, cloud storage streaming, and third-party radio, plus an AI DJ powered by Gemini (sign in with Google, no API key needed).
 
 ---
 ## Screenshot
@@ -17,8 +17,9 @@ SoundPulse is an Android music player that combines multi-format local playback,
 - **Graphic equalizer & bass boost**: shape the sound to your taste
 - **Local folder playback**: browse and play music straight from your device folders
 - **Cloud storage streaming**: stream your music library from the cloud
-- **Third-party radio integration**: listen to online radio stations
-- **AI integration**: powered by the Google Gemini API (server-side)
+- **Third-party radio integration**: listen to online radio stations, including a world radio directory (Radio Browser) with country filter
+- **AI DJ**: Gemini-powered playlist mixes via Firebase AI Logic. Sign in with Google, no API key required
+- **Lyrics & artwork**: synced fullscreen lyrics and iTunes artwork fallback
 
 ---
 
@@ -29,7 +30,7 @@ SoundPulse is an Android music player that combines multi-format local playback,
 - **UI:** Jetpack Compose
 - **Build system:** Gradle (Kotlin DSL)
 - **Code generation:** KSP
-- **AI:** Google Gemini API
+- **AI:** Gemini via Firebase AI Logic, Firebase Auth (Google Sign-In via Credential Manager), Firebase App Check
 - **Secrets management:** Secrets Gradle Plugin
 - **Services:** Google Services plugin
 
@@ -41,7 +42,7 @@ SoundPulse is an Android music player that combines multi-format local playback,
 soundpulse/
 ├── app/                    # Main Android application module
 ├── gradle/                 # Gradle wrapper & version catalog
-├── .env.example            # Environment variable template
+├── .env.example            # Notes (no API key needed anymore)
 ├── build.gradle.kts        # Top-level build configuration
 ├── settings.gradle.kts     # Project settings
 ├── gradle.properties       # Gradle properties
@@ -57,7 +58,7 @@ soundpulse/
 - [Android Studio](https://developer.android.com/studio) (latest stable recommended)
 - JDK 17 or newer
 - An Android device or emulator
-- A [Gemini API key](https://aistudio.google.com/app/apikey)
+- A [Firebase project](https://console.firebase.google.com/) (only needed for Google sign-in and the AI DJ)
 
 ### Installation
 
@@ -68,21 +69,18 @@ soundpulse/
    cd soundpulse
    ```
 
-2. **Configure your API key**
+2. **Set up Firebase (Google sign-in and AI DJ)**
 
-   Copy the example environment file:
+   The AI DJ uses Gemini through [Firebase AI Logic](https://firebase.google.com/docs/ai-logic). There is **no Gemini API key** in the app; users sign in with their Google account instead.
 
-   ```bash
-   cp .env.example .env
-   ```
+   1. Create a Firebase project and add an Android app with package name `com.aistudio.soundpulse.mzrkve`.
+   2. Add the **SHA-1 and SHA-256** fingerprints of your signing keys (debug and release) to that app.
+   3. Enable **Authentication → Sign-in method → Google**.
+   4. Open **Firebase AI Logic** in the console and enable the **Gemini Developer API**.
+   5. Set up **App Check** with the **Play Integrity** provider. App Check enforcement for Firebase AI Logic is mandatory from 2 November 2026. If you distribute the APK outside Google Play, follow the App Check docs for apps distributed outside Google Play. For debug builds, register the debug token printed in Logcat.
+   6. Download `google-services.json` (after enabling Google sign-in, so it includes the web client) and place it in `app/`.
 
-   Then open `.env`, uncomment the `GEMINI_API_KEY` line, and add your own key:
-
-   ```env
-   GEMINI_API_KEY=your_api_key_here
-   ```
-
-   > ⚠️ If the line stays commented out, the key will **not** be packaged into the APK and AI features will not work.
+   Without `google-services.json` the app still builds and runs; the AI DJ then falls back to local mixes.
 
 3. **Open in Android Studio**
 
