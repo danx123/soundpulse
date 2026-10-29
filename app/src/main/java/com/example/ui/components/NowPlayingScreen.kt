@@ -126,6 +126,7 @@ fun NowPlayingScreen(
     onOpenEqualizer: () -> Unit,
     onShowTrackDetails: (AudioTrack) -> Unit,
     onToggleFavorite: (String) -> Unit,
+    onOpenLyrics: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -179,6 +180,7 @@ fun NowPlayingScreen(
             // === 1. CINEMATIC LIGHTING (Artwork Blur in Player Area) ===
             TrackArtwork(
                 track = currentTrack,
+                priority = true,
                 modifier = Modifier
                     .fillMaxSize()
                     .blur(50.dp)
@@ -355,6 +357,7 @@ fun NowPlayingScreen(
                         ) {
                             TrackArtwork(
                                 track = currentTrack,
+                                priority = true,
                                 modifier = Modifier.fillMaxSize()
                             ) {
                                 Image(
@@ -624,7 +627,7 @@ fun NowPlayingScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -680,6 +683,23 @@ fun NowPlayingScreen(
                                 color = TextPrimary
                             )
                         }
+                    }
+
+                    // Lyrics launcher button
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { onOpenLyrics() }
+                            .testTag("now_playing_lyrics_btn"),
+                        color = DarkSurfaceVariant,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, aura.dominant.copy(alpha = 0.6f))
+                    ) {
+                        Text(
+                            text = "Lirik",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            color = TextPrimary,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
                     }
 
                     // Favorite button
