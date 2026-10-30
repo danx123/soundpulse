@@ -15,7 +15,7 @@ SoundPulse is an Android music player that combines multi-format local playback,
 
 ## ✨ Features
 
-- **Multi-format playback**: MP3, FLAC, WAV, AAC, and OGG
+- **Multi-format playback**: MP3, M4A, FLAC, WAV, AAC, and OGG
 - **Graphic equalizer & bass boost**: shape the sound to your taste
 - **Local folder playback**: browse and play music straight from your device folders
 - **Cloud storage streaming**: stream your music library from the cloud
