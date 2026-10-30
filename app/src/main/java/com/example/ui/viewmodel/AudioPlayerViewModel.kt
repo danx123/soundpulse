@@ -222,6 +222,9 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private val lyricsRefreshTick = MutableStateFlow(0)
     private var forceLyricsRefresh = false
 
+    private var lastNavTime = 0L
+    private val navDebounceMs = 350L
+
     init {
         // Ambil lirik saat layar lirik terbuka, dan ulangi bila lagu berganti
         viewModelScope.launch {
@@ -238,6 +241,20 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
         engine.setOnTrackCompletedListener {
             playNextTrack()
+        }
+
+        engine.setOnTrackStartedListener { track, durationMs ->
+            AudioPlayerBridge.currentPositionMs = 0L
+            AudioPlayerBridge.durationMs = durationMs
+            AudioPlayerBridge.isPlaying = true
+            AudioPlaybackService.startOrUpdate(
+                getApplication<Application>().applicationContext,
+                track = track,
+                isPlaying = true,
+                positionMs = 0L,
+                durationMs = durationMs
+            )
+            AudioPlayerBridge.onUpdatePlaybackState?.invoke(0L, durationMs, true)
         }
 
         // Connect media controls bridge for lockscreen, notification shade, and bluetooth
@@ -311,6 +328,15 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
         _playQueue.value = targetQueue
         val index = targetQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
         _currentIndex.value = index
+        AudioPlayerBridge.currentPositionMs = 0L
+        AudioPlayerBridge.durationMs = if (track.durationMs > 0) track.durationMs else 0L
+        AudioPlaybackService.startOrUpdate(
+            getApplication<Application>().applicationContext,
+            track = track,
+            isPlaying = true,
+            positionMs = 0L,
+            durationMs = if (track.durationMs > 0) track.durationMs else 0L
+        )
         engine.playTrack(track)
 
         // Record play stat in Room database
@@ -579,6 +605,10 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun playNextTrack() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastNavTime < navDebounceMs) return
+        lastNavTime = now
+
         val queue = _playQueue.value
         if (queue.isEmpty()) return
 
@@ -594,16 +624,21 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
         _currentIndex.value = nextIndex
         val nextTrack = queue[nextIndex]
-        engine.playTrack(nextTrack)
-        recordTrackPlay(nextTrack)
+        playTrack(nextTrack, queue)
     }
 
     fun playPreviousTrack() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastNavTime < navDebounceMs) return
+        lastNavTime = now
+
         val queue = _playQueue.value
         if (queue.isEmpty()) return
 
         if (engine.currentPositionMs.value > 4000L) {
             engine.seekTo(0L)
+            AudioPlayerBridge.currentPositionMs = 0L
+            AudioPlayerBridge.onUpdatePlaybackState?.invoke(0L, engine.durationMs.value, engine.isPlaying.value)
             return
         }
 
@@ -613,8 +648,7 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
         _currentIndex.value = prevIndex
         val prevTrack = queue[prevIndex]
-        engine.playTrack(prevTrack)
-        recordTrackPlay(prevTrack)
+        playTrack(prevTrack, queue)
     }
 
     // Queue / Playlist controls & reordering
@@ -696,7 +730,11 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun togglePlayPause() = engine.togglePlayPause()
 
-    fun seekTo(positionMs: Long) = engine.seekTo(positionMs)
+    fun seekTo(positionMs: Long) {
+        engine.seekTo(positionMs)
+        AudioPlayerBridge.currentPositionMs = positionMs
+        AudioPlayerBridge.onUpdatePlaybackState?.invoke(positionMs, engine.durationMs.value, engine.isPlaying.value)
+    }
 
     fun toggleShuffle() = engine.toggleShuffle()
 

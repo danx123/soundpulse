@@ -27,4 +27,6 @@ object AudioPlayerBridge {
 
     @Volatile
     var durationMs: Long = 0L
+
+    var onUpdatePlaybackState: ((positionMs: Long, durationMs: Long, isPlaying: Boolean) -> Unit)? = null
 }

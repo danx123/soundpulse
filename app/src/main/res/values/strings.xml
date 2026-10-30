@@ -101,7 +101,7 @@
     <string name="about">About</string>
     <string name="about_title">About SoundPulse</string>
     <string name="about_tagline">Next-Gen Audiophile &amp; AI-Driven Sound Engine</string>
-    <string name="about_version">v1.3.2 Pro Studio Edition</string>
+    <string name="about_version">v1.3.4 Pro Studio Edition</string>
     <string name="scan_device_audio">Scan Device Audio (Android 9+)</string>
     <string name="play_from_folder">Play from Folder</string>
     <string name="folder_loaded_title">Folder Loaded (%1$d Tracks)</string>
@@ -122,4 +122,11 @@
     <string name="about_footer_brand">Macan Angkasa</string>
     <string name="about_footer_by">Crafted with passion by</string>
     <string name="about_copyright">© 2026 Macan Angkasa. All rights reserved.</string>
+
+    <!-- Exit App Dialog -->
+    <string name="exit_app">Exit</string>
+    <string name="exit_dialog_title">Exit SoundPulse?</string>
+    <string name="exit_dialog_desc">Select an action. You can keep the app running in the background to continue playing audio, or exit the application completely.</string>
+    <string name="exit_minimize">Background</string>
+    <string name="exit_confirm">Close App</string>
 </resources>

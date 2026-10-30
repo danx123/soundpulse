@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Equalizer
@@ -99,6 +100,7 @@ import com.example.ui.theme.NeonPurple
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.service.AudioPlaybackService
 import com.example.ui.viewmodel.AudioPlayerViewModel
 import com.example.ui.viewmodel.MainTab
 import kotlinx.coroutines.launch
@@ -171,6 +173,7 @@ fun SoundPulseMainScreen(
     val radioQuery by viewModel.radioQuery.collectAsState()
 
     var showAboutDialog by remember { mutableStateOf(false) }
+    var showExitDialog by remember { mutableStateOf(false) }
 
     // Izin RECORD_AUDIO dibutuhkan Visualizer agar bar mengikuti beat (audio tidak direkam)
     val appContext = LocalContext.current
@@ -204,6 +207,15 @@ fun SoundPulseMainScreen(
         errorMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.engine.clearError()
+        }
+    }
+
+    // BackHandler agar tidak menutup aplikasi secara total saat menekan tombol back di layar utama
+    BackHandler(enabled = !isPlayerExpanded && selectedPlaylistDetail == null && !isLyricsVisible) {
+        when {
+            isQueueVisible -> viewModel.setQueueVisible(false)
+            currentTab != MainTab.LIBRARY -> viewModel.setTab(MainTab.LIBRARY)
+            else -> (appContext as? ComponentActivity)?.moveTaskToBack(true)
         }
     }
 
@@ -259,6 +271,16 @@ fun SoundPulseMainScreen(
                                 imageVector = Icons.Outlined.Info,
                                 contentDescription = stringResource(R.string.about),
                                 tint = NeonCyan
+                            )
+                        }
+                        IconButton(
+                            onClick = { showExitDialog = true },
+                            modifier = Modifier.testTag("exit_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = stringResource(R.string.exit_app),
+                                tint = TextSecondary
                             )
                         }
                     },
@@ -685,6 +707,68 @@ fun SoundPulseMainScreen(
     if (showAboutDialog) {
         AboutDialog(
             onDismiss = { showAboutDialog = false }
+        )
+    }
+
+    // Exit SoundPulse Confirmation Dialog
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                        contentDescription = null,
+                        tint = NeonCyan,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.exit_dialog_title),
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.exit_dialog_desc),
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showExitDialog = false
+                        viewModel.engine.pause()
+                        AudioPlaybackService.stop(appContext)
+                        (appContext as? ComponentActivity)?.finishAffinity()
+                    },
+                    modifier = Modifier.testTag("exit_confirm_button")
+                ) {
+                    Text(stringResource(R.string.exit_confirm), color = Color(0xFFFF5252))
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(
+                        onClick = { showExitDialog = false }
+                    ) {
+                        Text(stringResource(R.string.cancel), color = TextMuted)
+                    }
+                    TextButton(
+                        onClick = {
+                            showExitDialog = false
+                            (appContext as? ComponentActivity)?.moveTaskToBack(true)
+                        },
+                        modifier = Modifier.testTag("exit_minimize_button")
+                    ) {
+                        Text(stringResource(R.string.exit_minimize), color = NeonCyan)
+                    }
+                }
+            },
+            containerColor = DarkSurface
         )
     }
 }

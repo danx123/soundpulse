@@ -97,6 +97,11 @@ class AudioPlayerEngine(
 
     private var tickerJob: Job? = null
     private var onTrackCompletedListener: (() -> Unit)? = null
+    private var onTrackStartedListener: ((AudioTrack, Long) -> Unit)? = null
+
+    private val playerLock = Any()
+    private var playJob: Job? = null
+    private var currentPlayToken: Long = 0L
 
     init {
         startTicker()
@@ -104,6 +109,10 @@ class AudioPlayerEngine(
 
     fun setOnTrackCompletedListener(listener: () -> Unit) {
         onTrackCompletedListener = listener
+    }
+
+    fun setOnTrackStartedListener(listener: (AudioTrack, Long) -> Unit) {
+        onTrackStartedListener = listener
     }
 
     private fun startTicker() {
@@ -141,13 +150,25 @@ class AudioPlayerEngine(
     }
 
     fun playTrack(track: AudioTrack) {
+        val token: Long
+        synchronized(playerLock) {
+            currentPlayToken++
+            token = currentPlayToken
+        }
+        playJob?.cancel()
+
         _currentTrack.value = track
+        _currentPositionMs.value = 0L
+        _durationMs.value = if (track.durationMs > 0) track.durationMs else 0L
         _isBuffering.value = true
         _errorMessage.value = null
 
-        scope.launch(Dispatchers.IO) {
+        playJob = scope.launch(Dispatchers.IO) {
             try {
-                releaseMediaPlayer()
+                synchronized(playerLock) {
+                    if (token != currentPlayToken) return@launch
+                    releaseMediaPlayerLocked()
+                }
 
                 val player = MediaPlayer().apply {
                     setAudioAttributes(
@@ -166,18 +187,39 @@ class AudioPlayerEngine(
                     }
 
                     setOnPreparedListener { mp ->
+                        synchronized(playerLock) {
+                            if (token != currentPlayToken) {
+                                try { mp.stop() } catch (_: Exception) {}
+                                try { mp.release() } catch (_: Exception) {}
+                                return@setOnPreparedListener
+                            }
+                            mediaPlayer = mp
+                        }
                         scope.launch(Dispatchers.Main) {
+                            synchronized(playerLock) {
+                                if (token != currentPlayToken || mp != mediaPlayer) {
+                                    try { mp.stop() } catch (_: Exception) {}
+                                    try { mp.release() } catch (_: Exception) {}
+                                    return@launch
+                                }
+                            }
                             _isBuffering.value = false
-                            _durationMs.value = if (mp.duration > 0) mp.duration.toLong() else track.durationMs
+                            val dur = if (mp.duration > 0) mp.duration.toLong() else track.durationMs
+                            _durationMs.value = dur
+                            _currentPositionMs.value = 0L
                             setupAudioEffects(mp.audioSessionId, mp)
                             setupVisualizer(mp.audioSessionId)
                             applyPlaybackSpeedInternal(_playbackSpeed.value)
                             mp.start()
                             _isPlaying.value = true
+                            onTrackStartedListener?.invoke(track, dur)
                         }
                     }
 
                     setOnCompletionListener {
+                        synchronized(playerLock) {
+                            if (token != currentPlayToken) return@setOnCompletionListener
+                        }
                         scope.launch(Dispatchers.Main) {
                             when (_repeatMode.value) {
                                 RepeatMode.ONE -> {
@@ -194,6 +236,9 @@ class AudioPlayerEngine(
 
                     setOnErrorListener { _, what, extra ->
                         Log.e(TAG, "MediaPlayer error what=$what extra=$extra")
+                        synchronized(playerLock) {
+                            if (token != currentPlayToken) return@setOnErrorListener true
+                        }
                         scope.launch(Dispatchers.Main) {
                             _isBuffering.value = false
                             _isPlaying.value = false
@@ -205,9 +250,16 @@ class AudioPlayerEngine(
                     prepareAsync()
                 }
 
-                mediaPlayer = player
+                synchronized(playerLock) {
+                    if (token != currentPlayToken) {
+                        try { player.release() } catch (_: Exception) {}
+                    }
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error initiating playback", e)
+                synchronized(playerLock) {
+                    if (token != currentPlayToken) return@launch
+                }
                 scope.launch(Dispatchers.Main) {
                     _isBuffering.value = false
                     _isPlaying.value = false
@@ -482,12 +534,14 @@ class AudioPlayerEngine(
         }
     }
 
-    private fun releaseMediaPlayer() {
+    private fun releaseMediaPlayerLocked() {
         try {
             releaseVisualizer()
             releaseAudioEffects()
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
+            mediaPlayer?.let {
+                try { it.stop() } catch (_: Exception) {}
+                try { it.release() } catch (_: Exception) {}
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Error releasing media player", e)
         } finally {
@@ -495,9 +549,16 @@ class AudioPlayerEngine(
         }
     }
 
+    private fun releaseMediaPlayer() {
+        synchronized(playerLock) {
+            releaseMediaPlayerLocked()
+        }
+    }
+
     fun release() {
         tickerJob?.cancel()
         saveEqJob?.cancel()
+        playJob?.cancel()
         equalizerStore.save(_equalizerState.value)
         releaseMediaPlayer()
     }

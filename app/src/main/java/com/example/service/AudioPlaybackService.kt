@@ -60,6 +60,24 @@ class AudioPlaybackService : Service() {
         }
     }
 
+    private var lastNavActionTime: Long = 0L
+    private val navDebounceMs: Long = 400L
+    private var lastRenderedTrackId: String? = null
+
+    private fun safeSkipNext() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastNavActionTime < navDebounceMs) return
+        lastNavActionTime = now
+        AudioPlayerBridge.onNext?.invoke()
+    }
+
+    private fun safeSkipPrev() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastNavActionTime < navDebounceMs) return
+        lastNavActionTime = now
+        AudioPlayerBridge.onPrev?.invoke()
+    }
+
     private fun setupMediaSession() {
         mediaSession = MediaSession(this, "SoundPulseMediaSession").apply {
             setCallback(object : MediaSession.Callback() {
@@ -72,14 +90,16 @@ class AudioPlaybackService : Service() {
                 }
 
                 override fun onSkipToNext() {
-                    AudioPlayerBridge.onNext?.invoke()
+                    safeSkipNext()
                 }
 
                 override fun onSkipToPrevious() {
-                    AudioPlayerBridge.onPrev?.invoke()
+                    safeSkipPrev()
                 }
 
                 override fun onSeekTo(pos: Long) {
+                    AudioPlayerBridge.currentPositionMs = pos
+                    updateMediaSessionState(pos, AudioPlayerBridge.durationMs, AudioPlayerBridge.isPlaying)
                     AudioPlayerBridge.onSeekTo?.invoke(pos)
                 }
 
@@ -89,6 +109,12 @@ class AudioPlaybackService : Service() {
                 }
             })
             isActive = true
+        }
+
+        AudioPlayerBridge.onUpdatePlaybackState = { pos, dur, playing ->
+            serviceScope.launch(Dispatchers.Main) {
+                updateMediaSessionState(pos, dur, playing)
+            }
         }
     }
 
@@ -106,10 +132,10 @@ class AudioPlaybackService : Service() {
                 AudioPlayerBridge.onPause?.invoke() ?: AudioPlayerBridge.onPlayPause?.invoke()
             }
             ACTION_NEXT -> {
-                AudioPlayerBridge.onNext?.invoke()
+                safeSkipNext()
             }
             ACTION_PREV -> {
-                AudioPlayerBridge.onPrev?.invoke()
+                safeSkipPrev()
             }
             ACTION_STOP -> {
                 AudioPlayerBridge.onStop?.invoke()
@@ -142,10 +168,16 @@ class AudioPlaybackService : Service() {
 
     private fun render(track: AudioTrack, art: Bitmap?) {
         val isPlaying = AudioPlayerBridge.isPlaying
+        val isNewTrack = track.id != lastRenderedTrackId
+        if (isNewTrack) {
+            lastRenderedTrackId = track.id
+            AudioPlayerBridge.currentPositionMs = 0L
+        }
+        val pos = if (isNewTrack) 0L else AudioPlayerBridge.currentPositionMs
         updateMediaSession(
             track,
             isPlaying,
-            AudioPlayerBridge.currentPositionMs,
+            pos,
             AudioPlayerBridge.durationMs,
             art
         )
@@ -182,23 +214,60 @@ class AudioPlaybackService : Service() {
             )
             .setState(
                 if (isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
-                positionMs,
-                1.0f
+                positionMs.coerceAtLeast(0L),
+                if (isPlaying) 1.0f else 0.0f
             )
 
         session.setPlaybackState(stateBuilder.build())
 
+        val finalDuration = if (durationMs > 0) durationMs else track.durationMs
         val metadataBuilder = MediaMetadata.Builder()
             .putString(MediaMetadata.METADATA_KEY_TITLE, track.title)
             .putString(MediaMetadata.METADATA_KEY_ARTIST, track.artist)
             .putString(MediaMetadata.METADATA_KEY_ALBUM, track.album)
-            .putLong(MediaMetadata.METADATA_KEY_DURATION, if (durationMs > 0) durationMs else track.durationMs)
+            .putLong(MediaMetadata.METADATA_KEY_DURATION, if (finalDuration > 0) finalDuration else -1L)
 
         if (art != null) {
             metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, art)
         }
 
         session.setMetadata(metadataBuilder.build())
+    }
+
+    private fun updateMediaSessionState(positionMs: Long, durationMs: Long, isPlaying: Boolean) {
+        val session = mediaSession ?: return
+        val stateBuilder = PlaybackState.Builder()
+            .setActions(
+                PlaybackState.ACTION_PLAY or
+                PlaybackState.ACTION_PAUSE or
+                PlaybackState.ACTION_PLAY_PAUSE or
+                PlaybackState.ACTION_SKIP_TO_NEXT or
+                PlaybackState.ACTION_SKIP_TO_PREVIOUS or
+                PlaybackState.ACTION_SEEK_TO or
+                PlaybackState.ACTION_STOP
+            )
+            .setState(
+                if (isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
+                positionMs.coerceAtLeast(0L),
+                if (isPlaying) 1.0f else 0.0f
+            )
+
+        session.setPlaybackState(stateBuilder.build())
+
+        val track = AudioPlayerBridge.activeTrack
+        if (track != null) {
+            val finalDuration = if (durationMs > 0) durationMs else track.durationMs
+            val metadataBuilder = MediaMetadata.Builder()
+                .putString(MediaMetadata.METADATA_KEY_TITLE, track.title)
+                .putString(MediaMetadata.METADATA_KEY_ARTIST, track.artist)
+                .putString(MediaMetadata.METADATA_KEY_ALBUM, track.album)
+                .putLong(MediaMetadata.METADATA_KEY_DURATION, if (finalDuration > 0) finalDuration else -1L)
+
+            ArtworkLoader.peek(track)?.let { art ->
+                metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, art)
+            }
+            session.setMetadata(metadataBuilder.build())
+        }
     }
 
     private fun buildNotification(track: AudioTrack, isPlaying: Boolean, art: Bitmap?): Notification {
@@ -311,6 +380,7 @@ class AudioPlaybackService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        AudioPlayerBridge.onUpdatePlaybackState = null
         artJob?.cancel()
         serviceScope.cancel()
         mediaSession?.apply {
