@@ -32,6 +32,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,19 +44,27 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
 import com.example.data.model.AudioTrack
+import com.example.data.model.RadioBrowserState
+import com.example.data.model.RadioCountry
 import com.example.data.model.StreamingStation
 import com.example.ui.theme.DarkBg
 import com.example.ui.theme.DarkCardBorder
@@ -76,9 +86,20 @@ fun StreamingScreen(
     isPlaying: Boolean,
     onStationSelect: (StreamingStation) -> Unit,
     onAddCustomStation: (name: String, genre: String, url: String, desc: String) -> Unit,
+    radioState: RadioBrowserState = RadioBrowserState(),
+    radioCountries: List<RadioCountry> = emptyList(),
+    selectedRadioCountry: RadioCountry? = null,
+    radioQuery: String = "",
+    onRadioEnter: () -> Unit = {},
+    onSelectRadioCountry: (RadioCountry?) -> Unit = {},
+    onRadioQueryChange: (String) -> Unit = {},
+    onLoadMoreRadio: () -> Unit = {},
+    onRetryRadio: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    // 0 = Terkurasi, 1 = Radio Dunia (Radio Browser)
+    var mode by rememberSaveable { mutableIntStateOf(0) }
 
     Column(
         modifier = modifier
@@ -159,52 +180,110 @@ fun StreamingScreen(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Row with Section Title and Add Station Button
+        // Pilihan sumber: stasiun terkurasi atau Radio Dunia (Radio Browser)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = "Saluran Terkurasi (${stations.size})",
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                color = TextPrimary
-            )
-
-            Button(
-                onClick = { showAddDialog = true },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = DarkSurfaceVariant,
-                    contentColor = NeonCyan
-                ),
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, NeonCyan.copy(alpha = 0.4f)),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                modifier = Modifier.testTag("add_custom_station_btn")
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Tambah URL Radio", fontSize = 12.sp)
+            val labels = listOf("Terkurasi (${stations.size})", "Radio Dunia")
+            labels.forEachIndexed { index, label ->
+                val selected = mode == index
+                FilterChip(
+                    selected = selected,
+                    onClick = {
+                        mode = index
+                        if (index == 1) onRadioEnter()
+                    },
+                    label = {
+                        Text(
+                            text = label,
+                            fontSize = 12.sp,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = NeonCyan.copy(alpha = 0.2f),
+                        selectedLabelColor = NeonCyan,
+                        containerColor = DarkSurface,
+                        labelColor = TextSecondary
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = selected,
+                        borderColor = if (selected) NeonCyan else DarkCardBorder
+                    ),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.testTag(if (index == 0) "radio_tab_curated" else "radio_tab_world")
+                )
             }
         }
 
-        // Stations List
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(stations, key = { it.id }) { station ->
-                val isCurrentlyPlayingThis = currentTrack?.uri == station.streamUrl
-                StationItemCard(
-                    station = station,
-                    isCurrent = isCurrentlyPlayingThis,
-                    isPlaying = isCurrentlyPlayingThis && isPlaying,
-                    onSelect = { onStationSelect(station) }
+        Spacer(modifier = Modifier.height(6.dp))
+
+        if (mode == 0) {
+            // Row with Section Title and Add Station Button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Saluran Terkurasi (${stations.size})",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = TextPrimary
                 )
+
+                Button(
+                    onClick = { showAddDialog = true },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DarkSurfaceVariant,
+                        contentColor = NeonCyan
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NeonCyan.copy(alpha = 0.4f)),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.testTag("add_custom_station_btn")
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Tambah URL Radio", fontSize = 12.sp)
+                }
             }
+
+            // Stations List
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(stations, key = { it.id }) { station ->
+                    val isCurrentlyPlayingThis = currentTrack?.uri == station.streamUrl
+                    StationItemCard(
+                        station = station,
+                        isCurrent = isCurrentlyPlayingThis,
+                        isPlaying = isCurrentlyPlayingThis && isPlaying,
+                        onSelect = { onStationSelect(station) }
+                    )
+                }
+            }
+        } else {
+            RadioBrowserSection(
+                state = radioState,
+                countries = radioCountries,
+                selectedCountry = selectedRadioCountry,
+                query = radioQuery,
+                currentTrack = currentTrack,
+                isPlaying = isPlaying,
+                onSelectCountry = onSelectRadioCountry,
+                onQueryChange = onRadioQueryChange,
+                onStationSelect = onStationSelect,
+                onLoadMore = onLoadMoreRadio,
+                onRetry = onRetryRadio
+            )
         }
     }
 
@@ -340,20 +419,22 @@ fun StationItemCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                if (isCurrent && isPlaying) {
-                    Icon(
-                        imageVector = Icons.Default.GraphicEq,
-                        contentDescription = "Playing",
-                        tint = DarkBg,
-                        modifier = Modifier.size(28.dp)
-                    )
+                val artUrl = station.artworkUrl
+                if (artUrl != null && artUrl.startsWith("http")) {
+                    SubcomposeAsyncImage(
+                        model = artUrl,
+                        contentDescription = station.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        if (painter.state is AsyncImagePainter.State.Success) {
+                            SubcomposeAsyncImageContent()
+                        } else {
+                            StationGlyph(isCurrent = isCurrent, isPlaying = isPlaying)
+                        }
+                    }
                 } else {
-                    Icon(
-                        imageVector = Icons.Default.Radio,
-                        contentDescription = "Radio",
-                        tint = if (isCurrent) DarkBg else NeonCyan,
-                        modifier = Modifier.size(26.dp)
-                    )
+                    StationGlyph(isCurrent = isCurrent, isPlaying = isPlaying)
                 }
             }
 
@@ -457,5 +538,24 @@ fun StationItemCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun StationGlyph(isCurrent: Boolean, isPlaying: Boolean) {
+    if (isCurrent && isPlaying) {
+        Icon(
+            imageVector = Icons.Default.GraphicEq,
+            contentDescription = "Playing",
+            tint = DarkBg,
+            modifier = Modifier.size(28.dp)
+        )
+    } else {
+        Icon(
+            imageVector = Icons.Default.Radio,
+            contentDescription = "Radio",
+            tint = if (isCurrent) DarkBg else NeonCyan,
+            modifier = Modifier.size(26.dp)
+        )
     }
 }
