@@ -150,6 +150,12 @@ fun SoundPulseApp(
     val folderLoadedState by viewModel.folderLoadedState.collectAsState()
     val isLyricsVisible by viewModel.isLyricsVisible.collectAsState()
     val lyricsState by viewModel.lyricsState.collectAsState()
+    val authState by viewModel.authState.collectAsState()
+    val isAiMixLoading by viewModel.isAiMixLoading.collectAsState()
+    val radioState by viewModel.radioState.collectAsState()
+    val radioCountries by viewModel.radioCountries.collectAsState()
+    val selectedRadioCountry by viewModel.selectedRadioCountry.collectAsState()
+    val radioQuery by viewModel.radioQuery.collectAsState()
 
     var showAboutDialog by remember { mutableStateOf(false) }
 
@@ -448,6 +454,10 @@ fun SoundPulseApp(
                     onPlaySmartPlaylist = { p -> viewModel.playSmartPlaylist(p) },
                     onPlayTrack = { track -> viewModel.playTrack(track) },
                     onGenerateCustomAiMix = { prompt -> viewModel.generateCustomAiMix(prompt) },
+                    authState = authState,
+                    isAiMixLoading = isAiMixLoading,
+                    onSignInWithGoogle = { viewModel.signInWithGoogle(appContext) },
+                    onSignOut = { viewModel.signOutGoogle() },
                     onAboutClick = { showAboutDialog = true }
                 )
 
@@ -458,7 +468,16 @@ fun SoundPulseApp(
                     onStationSelect = { station -> viewModel.playStation(station) },
                     onAddCustomStation = { name, genre, url, desc ->
                         viewModel.addCustomStation(name, genre, url, desc)
-                    }
+                    },
+                    radioState = radioState,
+                    radioCountries = radioCountries,
+                    selectedRadioCountry = selectedRadioCountry,
+                    radioQuery = radioQuery,
+                    onRadioEnter = { viewModel.ensureRadioLoaded() },
+                    onSelectRadioCountry = { country -> viewModel.selectRadioCountry(country) },
+                    onRadioQueryChange = { q -> viewModel.setRadioQuery(q) },
+                    onLoadMoreRadio = { viewModel.loadMoreRadio() },
+                    onRetryRadio = { viewModel.retryRadio() }
                 )
 
                 MainTab.CLOUD -> CloudScreen(
