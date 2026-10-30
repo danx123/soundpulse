@@ -7,9 +7,11 @@ SoundPulse is an Android music player that combines multi-format local playback,
 ---
 ## Screenshot
 
-<img width="720" height="1600" alt="Screenshot_2026-10-28-23-59-30-34" src="https://github.com/user-attachments/assets/a6ef946e-6172-499a-b9a0-4673ba16edbf" />
+<img width="720" height="1600" alt="WhatsApp Image 2026-10-30 at 08 44 25" src="https://github.com/user-attachments/assets/30a544f3-2253-490b-ab51-a41946aaf948" />
 
-<img width="720" height="1600" alt="Screenshot_2026-10-28-23-48-17-51" src="https://github.com/user-attachments/assets/5245ea31-46f6-44e9-a6cc-e275a7209abf" />
+<img width="720" height="1600" alt="WhatsApp Image 2026-10-30 at 08 44 24" src="https://github.com/user-attachments/assets/a5327b1a-c96d-4797-b95a-cd3a65a61b55" />
+
+
 
 ## ✨ Features
 
@@ -69,20 +71,7 @@ soundpulse/
    cd soundpulse
    ```
 
-2. **Set up Firebase (Google sign-in and AI DJ)**
-
-   The AI DJ uses Gemini through [Firebase AI Logic](https://firebase.google.com/docs/ai-logic). There is **no Gemini API key** in the app; users sign in with their Google account instead.
-
-   1. Create a Firebase project and add an Android app with package name `com.aistudio.soundpulse.mzrkve`.
-   2. Add the **SHA-1 and SHA-256** fingerprints of your signing keys (debug and release) to that app.
-   3. Enable **Authentication → Sign-in method → Google**.
-   4. Open **Firebase AI Logic** in the console and enable the **Gemini Developer API**.
-   5. Set up **App Check** with the **Play Integrity** provider. App Check enforcement for Firebase AI Logic is mandatory from 2 November 2026. If you distribute the APK outside Google Play, follow the App Check docs for apps distributed outside Google Play. For debug builds, register the debug token printed in Logcat.
-   6. Download `google-services.json` (after enabling Google sign-in, so it includes the web client) and place it in `app/`.
-
-   Without `google-services.json` the app still builds and runs; the AI DJ then falls back to local mixes.
-
-3. **Open in Android Studio**
+2. **Open in Android Studio**
 
    Open the project folder, wait for the Gradle sync to finish, then run the `app` configuration on a device or emulator.
 
