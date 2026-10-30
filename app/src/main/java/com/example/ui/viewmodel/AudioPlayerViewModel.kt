@@ -1,10 +1,14 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewModelScope
 import com.example.audio.AudioPlayerEngine
+import com.example.data.auth.AuthState
+import com.example.data.auth.GoogleAuthManager
 import com.example.audio.RepeatMode
 import com.example.data.local.SoundPulseDatabase
 import com.example.data.local.entity.PlaylistEntity
@@ -18,14 +22,20 @@ import com.example.data.model.AudioTrack
 import com.example.data.model.EqualizerPreset
 import com.example.data.model.EqualizerState
 import com.example.data.model.LyricsUiState
+import com.example.data.model.RadioBrowserState
+import com.example.data.model.RadioCountry
 import com.example.data.model.SmartPlaylist
+import com.example.data.model.SmartPlaylistType
 import com.example.data.model.StreamingStation
+import com.example.data.repository.AiDjService
 import com.example.data.repository.AiMusicRecommender
 import com.example.data.repository.AudioRepository
 import com.example.data.repository.LyricsRepository
 import com.example.data.repository.PlaylistRepository
+import com.example.data.repository.RadioBrowserRepository
 import com.example.service.AudioPlaybackService
 import com.example.service.AudioPlayerBridge
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -38,6 +48,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.IOException
+import java.util.Locale
+import java.util.UUID
 
 enum class MainTab {
     LIBRARY,
@@ -166,6 +179,33 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _folderLoadedState = MutableStateFlow<FolderLoadedState?>(null)
     val folderLoadedState: StateFlow<FolderLoadedState?> = _folderLoadedState.asStateFlow()
+
+    // Login Google & AI DJ (Gemini lewat Firebase AI Logic, tanpa API key)
+    private val authManager = GoogleAuthManager(application.applicationContext)
+    val authState: StateFlow<AuthState> = authManager.state
+    private val aiDjService = AiDjService()
+
+    private val _isAiMixLoading = MutableStateFlow(false)
+    val isAiMixLoading: StateFlow<Boolean> = _isAiMixLoading.asStateFlow()
+
+    // Radio Browser (radio dunia + filter negara)
+    private val radioRepository = RadioBrowserRepository()
+
+    private val _radioCountries = MutableStateFlow<List<RadioCountry>>(emptyList())
+    val radioCountries: StateFlow<List<RadioCountry>> = _radioCountries.asStateFlow()
+
+    private val _selectedRadioCountry = MutableStateFlow<RadioCountry?>(null)
+    val selectedRadioCountry: StateFlow<RadioCountry?> = _selectedRadioCountry.asStateFlow()
+
+    private val _radioQuery = MutableStateFlow("")
+    val radioQuery: StateFlow<String> = _radioQuery.asStateFlow()
+
+    private val _radioState = MutableStateFlow(RadioBrowserState())
+    val radioState: StateFlow<RadioBrowserState> = _radioState.asStateFlow()
+
+    private var radioInitialized = false
+    private var radioLoadJob: Job? = null
+    private var radioOffset = 0
 
     // Lirik layar penuh
     private val lyricsRepository = LyricsRepository(application.applicationContext)
@@ -314,6 +354,13 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
         _currentIndex.value = 0
         engine.playTrack(track)
         recordTrackPlay(track)
+
+        // Daftarkan klik ke Radio Browser (etika API)
+        if (station.id.startsWith("rb_")) {
+            viewModelScope.launch(Dispatchers.IO) {
+                radioRepository.registerClick(station.id.removePrefix("rb_"))
+            }
+        }
     }
 
     fun playPlaylist(playlistWithTracks: PlaylistWithTracks, startIndex: Int = 0) {
@@ -346,8 +393,144 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun generateCustomAiMix(prompt: String) {
-        val mix = aiRecommender.createCustomAiPlaylist(prompt, allTracks.value)
-        playSmartPlaylist(mix)
+        if (_isAiMixLoading.value) return
+        viewModelScope.launch {
+            val tracks = allTracks.value
+
+            if (authState.value is AuthState.SignedIn) {
+                _isAiMixLoading.value = true
+                try {
+                    val result = aiDjService.generateMix(prompt, tracks)
+                    val byId = tracks.associateBy { it.id }
+                    val picked = result.trackIds.mapNotNull { byId[it] }.distinctBy { it.id }
+                    if (picked.isNotEmpty()) {
+                        playSmartPlaylist(
+                            SmartPlaylist(
+                                id = "ai_gemini_${UUID.randomUUID()}",
+                                title = "AI Mix: ${result.title}",
+                                description = result.description,
+                                badge = "GEMINI AI",
+                                type = SmartPlaylistType.AI_CUSTOM,
+                                tracks = picked,
+                                accentColor = Color(0xFF00F0FF)
+                            )
+                        )
+                        return@launch
+                    }
+                    _userMessage.value = "AI tidak menemukan lagu yang cocok, memakai mix lokal"
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _userMessage.value = "AI DJ gagal (${e.localizedMessage ?: "kesalahan tidak dikenal"}), memakai mix lokal"
+                } finally {
+                    _isAiMixLoading.value = false
+                }
+            } else {
+                _userMessage.value = "Masuk dengan Google untuk memakai AI DJ Gemini. Memakai mix lokal."
+            }
+
+            playSmartPlaylist(aiRecommender.createCustomAiPlaylist(prompt, tracks))
+        }
+    }
+
+    fun signInWithGoogle(activityContext: Context) {
+        viewModelScope.launch {
+            authManager.signIn(activityContext)?.let { _userMessage.value = it }
+        }
+    }
+
+    fun signOutGoogle() {
+        viewModelScope.launch {
+            authManager.signOut()
+            _userMessage.value = "Berhasil keluar dari akun Google"
+        }
+    }
+
+    // ---- Radio Browser ----
+
+    fun ensureRadioLoaded() {
+        if (radioInitialized) return
+        radioInitialized = true
+        viewModelScope.launch {
+            _radioState.value = RadioBrowserState(isLoading = true)
+            try {
+                val countries = radioRepository.getCountries()
+                _radioCountries.value = countries
+                // Negara awal = negara perangkat bila tersedia
+                val deviceCode = Locale.getDefault().country.uppercase()
+                _selectedRadioCountry.value = countries.firstOrNull { it.code == deviceCode }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Daftar negara gagal dimuat: lanjut tanpa filter, error ditangani saat memuat stasiun
+            }
+            reloadRadio()
+        }
+    }
+
+    fun selectRadioCountry(country: RadioCountry?) {
+        _selectedRadioCountry.value = country
+        reloadRadio()
+    }
+
+    fun setRadioQuery(query: String) {
+        _radioQuery.value = query
+        reloadRadio(debounceMs = 400L)
+    }
+
+    fun retryRadio() {
+        if (_radioCountries.value.isEmpty()) {
+            radioInitialized = false
+            ensureRadioLoaded()
+        } else {
+            reloadRadio()
+        }
+    }
+
+    private fun reloadRadio(debounceMs: Long = 0L) {
+        radioLoadJob?.cancel()
+        radioLoadJob = viewModelScope.launch {
+            if (debounceMs > 0) delay(debounceMs)
+            _radioState.value = RadioBrowserState(isLoading = true)
+            _radioState.value = try {
+                val page = radioRepository.searchStations(
+                    _selectedRadioCountry.value?.code, _radioQuery.value, 0
+                )
+                radioOffset = RadioBrowserRepository.PAGE_SIZE
+                RadioBrowserState(stations = page.stations, canLoadMore = page.hasMore)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IOException) {
+                RadioBrowserState(error = "Tidak dapat terhubung ke Radio Browser. Periksa koneksi internet.")
+            } catch (e: Exception) {
+                RadioBrowserState(error = "Gagal memuat stasiun: ${e.localizedMessage ?: "kesalahan tidak dikenal"}")
+            }
+        }
+    }
+
+    fun loadMoreRadio() {
+        val current = _radioState.value
+        if (current.isLoading || !current.canLoadMore) return
+        radioLoadJob?.cancel()
+        radioLoadJob = viewModelScope.launch {
+            _radioState.value = current.copy(isLoading = true, error = null)
+            _radioState.value = try {
+                val page = radioRepository.searchStations(
+                    _selectedRadioCountry.value?.code, _radioQuery.value, radioOffset
+                )
+                radioOffset += RadioBrowserRepository.PAGE_SIZE
+                current.copy(
+                    stations = (current.stations + page.stations).distinctBy { it.id },
+                    isLoading = false,
+                    error = null,
+                    canLoadMore = page.hasMore
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                current.copy(isLoading = false, error = "Gagal memuat stasiun berikutnya.", canLoadMore = true)
+            }
+        }
     }
 
     fun createPlaylist(title: String, description: String, type: PlaylistType) {
