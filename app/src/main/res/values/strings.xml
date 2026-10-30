@@ -129,4 +129,9 @@
     <string name="exit_dialog_desc">Select an action. You can keep the app running in the background to continue playing audio, or exit the application completely.</string>
     <string name="exit_minimize">Background</string>
     <string name="exit_confirm">Close App</string>
+
+    <!-- Queue Sheet Strings -->
+    <string name="queue_focus_current">Current</string>
+    <string name="queue_playing_now">Playing #%1$d of %2$d • Tap to focus</string>
+    <string name="queue_order_hint">%1$d tracks • Drag ≡ to reorder</string>
 </resources>

@@ -54,12 +54,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
+import com.example.R
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -105,6 +110,40 @@ fun CurrentQueueSheet(
     modifier: Modifier = Modifier
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val coroutineScope = rememberCoroutineScope()
+
+    // Cari posisi indeks lagu yang sedang aktif diputar
+    val playingIndex = remember(queue, currentTrack?.id) {
+        val idx = queue.indexOfFirst { it.id == currentTrack?.id }
+        if (idx >= 0) idx else 0
+    }
+
+    // Inisialisasi posisi awal daftar agar langsung fokus ke lagu yang sedang diputar (bukan di paling atas)
+    val initialScrollIndex = remember {
+        (playingIndex - 1).coerceAtLeast(0)
+    }
+
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initialScrollIndex
+    )
+
+    // Animasi scroll halus ke lagu yang sedang diputar saat antrean dibuka atau saat berpindah lagu
+    LaunchedEffect(currentTrack?.id) {
+        val targetIdx = queue.indexOfFirst { it.id == currentTrack?.id }
+        if (targetIdx >= 0) {
+            val targetScroll = (targetIdx - 1).coerceAtLeast(0)
+            listState.animateScrollToItem(targetScroll)
+        }
+    }
+
+    val scrollToCurrentTrack: () -> Unit = {
+        val targetIdx = queue.indexOfFirst { it.id == currentTrack?.id }
+        if (targetIdx >= 0) {
+            coroutineScope.launch {
+                listState.animateScrollToItem((targetIdx - 1).coerceAtLeast(0))
+            }
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -133,7 +172,7 @@ fun CurrentQueueSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Header Row
+            // Header Row (Dapat diketuk untuk langsung fokus ke lagu aktif)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -144,7 +183,8 @@ fun CurrentQueueSheet(
                         .clip(CircleShape)
                         .background(
                             Brush.linearGradient(listOf(NeonCyan.copy(alpha = 0.25f), NeonPurple.copy(alpha = 0.35f)))
-                        ),
+                        )
+                        .clickable(enabled = currentTrack != null) { scrollToCurrentTrack() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -157,16 +197,28 @@ fun CurrentQueueSheet(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(enabled = currentTrack != null) { scrollToCurrentTrack() }
+                ) {
                     Text(
                         text = "Daftar Putar (Antrean)",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = TextPrimary
                     )
+                    val currentPos = queue.indexOfFirst { it.id == currentTrack?.id }
+                    val subtitle = if (currentPos >= 0) {
+                        stringResource(R.string.queue_playing_now, currentPos + 1, queue.size)
+                    } else {
+                        stringResource(R.string.queue_order_hint, queue.size)
+                    }
                     Text(
-                        text = "${queue.size} lagu • Seret ikon ≡ untuk atur urutan",
+                        text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
+                        color = if (currentPos >= 0) NeonCyan else TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -186,21 +238,48 @@ fun CurrentQueueSheet(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Quick Action Toolbar (Acak Urutan & Kosongkan Antrean)
+            // Quick Action Toolbar (Fokus Lagu Aktif, Acak Urutan & Kosongkan Antrean)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Tombol Cepat: Fokus ke lagu yang sedang diputar
+                OutlinedButton(
+                    onClick = scrollToCurrentTrack,
+                    enabled = currentTrack != null && queue.any { it.id == currentTrack.id },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = NeonCyan,
+                        disabledContentColor = TextMuted.copy(alpha = 0.4f)
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (currentTrack != null) NeonCyan.copy(alpha = 0.5f) else TextMuted.copy(alpha = 0.2f)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    modifier = Modifier
+                        .weight(1.1f)
+                        .testTag("queue_focus_current_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.GraphicEq,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(stringResource(R.string.queue_focus_current), fontSize = 11.sp, maxLines = 1)
+                }
+
                 OutlinedButton(
                     onClick = onShuffleQueue,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = NeonCyan
+                        contentColor = TextSecondary
                     ),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, NeonCyan.copy(alpha = 0.4f)),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, TextMuted.copy(alpha = 0.35f)),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(0.95f)
                         .testTag("queue_shuffle_btn")
                 ) {
                     Icon(
@@ -208,8 +287,8 @@ fun CurrentQueueSheet(
                         contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Acak Antrean", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Acak", fontSize = 11.sp, maxLines = 1)
                 }
 
                 OutlinedButton(
@@ -219,9 +298,9 @@ fun CurrentQueueSheet(
                         contentColor = NeonPink
                     ),
                     border = androidx.compose.foundation.BorderStroke(1.dp, NeonPink.copy(alpha = 0.4f)),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(0.95f)
                         .testTag("queue_clear_btn")
                 ) {
                     Icon(
@@ -229,8 +308,8 @@ fun CurrentQueueSheet(
                         contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Reset Antrean", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Reset", fontSize = 11.sp, maxLines = 1)
                 }
             }
 
@@ -265,8 +344,6 @@ fun CurrentQueueSheet(
                     }
                 }
             } else {
-                val listState = rememberLazyListState()
-
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -444,13 +521,32 @@ fun QueueItemRow(
 
             // Title & Artist
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = track.title,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = if (isCurrent) NeonCyan else TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = track.title,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = if (isCurrent) NeonCyan else TextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (isCurrent) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = NeonCyan.copy(alpha = 0.2f),
+                            border = androidx.compose.foundation.BorderStroke(0.5.dp, NeonCyan)
+                        ) {
+                            Text(
+                                text = if (isPlaying) "MEMUTAR" else "JEDA",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = NeonCyan,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = track.artist,

@@ -129,4 +129,9 @@
     <string name="exit_dialog_desc">Pilih tindakan yang diinginkan. Anda dapat membiarkan aplikasi berjalan di latar belakang agar musik tetap berputar, atau menutup aplikasi sepenuhnya.</string>
     <string name="exit_minimize">Latar Belakang</string>
     <string name="exit_confirm">Tutup Total</string>
+
+    <!-- Queue Sheet Strings -->
+    <string name="queue_focus_current">Lagu Aktif</string>
+    <string name="queue_playing_now">Memutar #%1$d dari %2$d • Ketuk untuk fokus</string>
+    <string name="queue_order_hint">%1$d lagu • Seret ikon ≡ untuk atur urutan</string>
 </resources>
