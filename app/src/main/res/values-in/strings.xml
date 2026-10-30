@@ -101,7 +101,7 @@
     <string name="about">Tentang</string>
     <string name="about_title">Tentang SoundPulse</string>
     <string name="about_tagline">Mesin Audio Audiophile &amp; Kecerdasan Buatan Generasi Baru</string>
-    <string name="about_version">v1.3.4 Pro Studio Edition</string>
+    <string name="about_version">v1.3.5 Pro Studio Edition</string>
     <string name="scan_device_audio">Pindai Lagu Perangkat (Android 9+)</string>
     <string name="play_from_folder">Putar dari Folder</string>
     <string name="folder_loaded_title">Folder Dimuat (%1$d Lagu)</string>
