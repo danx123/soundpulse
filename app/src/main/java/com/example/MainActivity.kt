@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                SoundPulseApp()
+                SoundPulseMainScreen()
             }
         }
     }
@@ -116,6 +116,14 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SoundPulseApp(
+    viewModel: AudioPlayerViewModel = viewModel()
+) {
+    SoundPulseMainScreen(viewModel)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SoundPulseMainScreen(
     viewModel: AudioPlayerViewModel = viewModel()
 ) {
     val currentTab by viewModel.currentTab.collectAsState()

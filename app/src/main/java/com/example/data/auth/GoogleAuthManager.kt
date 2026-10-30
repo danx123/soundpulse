@@ -49,29 +49,41 @@ class GoogleAuthManager(context: Context) {
     val state: StateFlow<AuthState> = _state.asStateFlow()
 
     private val firebaseReady: Boolean
-        get() = FirebaseApp.getApps(appContext).isNotEmpty()
+        get() = try {
+            FirebaseApp.getApps(appContext).isNotEmpty()
+        } catch (e: Throwable) {
+            false
+        }
 
     /** default_web_client_id dibuat plugin google-services; dicari lewat nama agar build tetap jalan tanpa file itu. */
     private fun webClientId(): String? {
-        val id = appContext.resources.getIdentifier("default_web_client_id", "string", appContext.packageName)
-        return if (id != 0) appContext.getString(id) else null
+        return try {
+            val id = appContext.resources.getIdentifier("default_web_client_id", "string", appContext.packageName)
+            if (id != 0) appContext.getString(id) else null
+        } catch (e: Throwable) {
+            null
+        }
     }
 
     val isConfigured: Boolean
         get() = firebaseReady && webClientId() != null
 
     init {
-        if (isConfigured) {
-            val auth = FirebaseAuth.getInstance()
-            _state.value = auth.currentUser?.let { AuthState.SignedIn(it.toAuthUser()) } ?: AuthState.SignedOut
-            auth.addAuthStateListener { a ->
-                val user = a.currentUser
-                if (user != null) {
-                    _state.value = AuthState.SignedIn(user.toAuthUser())
-                } else if (_state.value !is AuthState.SigningIn) {
-                    _state.value = AuthState.SignedOut
+        try {
+            if (isConfigured) {
+                val auth = FirebaseAuth.getInstance()
+                _state.value = auth.currentUser?.let { AuthState.SignedIn(it.toAuthUser()) } ?: AuthState.SignedOut
+                auth.addAuthStateListener { a ->
+                    val user = a.currentUser
+                    if (user != null) {
+                        _state.value = AuthState.SignedIn(user.toAuthUser())
+                    } else if (_state.value !is AuthState.SigningIn) {
+                        _state.value = AuthState.SignedOut
+                    }
                 }
             }
+        } catch (e: Throwable) {
+            Log.w(TAG, "Gagal menginisialisasi Auth: ${e.message}")
         }
     }
 

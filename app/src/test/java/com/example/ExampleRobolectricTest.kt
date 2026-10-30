@@ -236,4 +236,12 @@ class ExampleRobolectricTest {
     val count = repository.scanMediaStoreAudio()
     assertTrue("Scan MediaStore harus selesai tanpa exception (ditemukan $count)", count >= 0)
   }
+
+  @Test
+  fun `verify MainActivity launches and initializes successfully`() {
+    val controller = org.robolectric.Robolectric.buildActivity(MainActivity::class.java).setup()
+    val activity = controller.get()
+    assertNotNull("MainActivity harus terpasang", activity)
+    controller.pause().stop().destroy()
+  }
 }
