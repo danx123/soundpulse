@@ -14,22 +14,13 @@ class SoundPulseApplication : Application() {
         super.onCreate()
 
         // Inisialisasi Firebase secara aman jika tersedia konfigurasi (google-services.json).
-        // Jika belum dikonfigurasi, app tetap berjalan penuh secara offline/lokal tanpa crash.
+        // App Check dikonfigurasi di MainActivity.onCreate() bersama intent.
         try {
             if (FirebaseApp.getApps(this).isEmpty()) {
                 FirebaseApp.initializeApp(this)
             }
-            if (FirebaseApp.getApps(this).isNotEmpty()) {
-                Firebase.appCheck.installAppCheckProviderFactory(
-                    if (BuildConfig.DEBUG) {
-                        DebugAppCheckProviderFactory.getInstance()
-                    } else {
-                        PlayIntegrityAppCheckProviderFactory.getInstance()
-                    }
-                )
-            }
         } catch (e: Throwable) {
-            Log.w("SoundPulseApp", "Firebase belum dikonfigurasi atau tidak aktif: ${e.message}")
+            Log.w("SoundPulseApp", "Firebase belum aktif: ${e.message}")
         }
     }
 }

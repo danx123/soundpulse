@@ -9,6 +9,8 @@ import android.os.Build
 import android.util.LruCache
 import android.util.Size
 import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.example.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -213,7 +215,14 @@ fun TrackArtwork(
     sizePx: Int = 512,
     online: Boolean = true,
     priority: Boolean = false,
-    fallback: @Composable () -> Unit
+    fallback: @Composable () -> Unit = {
+        Image(
+            painter = painterResource(id = R.drawable.img_default_album_cover),
+            contentDescription = "Album Art",
+            contentScale = contentScale,
+            modifier = modifier
+        )
+    }
 ) {
     val context = LocalContext.current.applicationContext
     val bitmap by produceState<Bitmap?>(

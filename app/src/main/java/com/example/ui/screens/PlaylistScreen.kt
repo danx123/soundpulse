@@ -23,10 +23,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -77,10 +79,12 @@ fun PlaylistScreen(
     onSelectPlaylist: (PlaylistWithTracks) -> Unit,
     onPlayPlaylist: (PlaylistWithTracks) -> Unit,
     onCreatePlaylist: (title: String, description: String, type: PlaylistType) -> Unit,
+    onDeletePlaylist: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var selectedTypeFilter by remember { mutableStateOf<PlaylistType?>(null) }
+    var playlistToDelete by remember { mutableStateOf<PlaylistWithTracks?>(null) }
 
     val filteredPlaylists = remember(playlists, selectedTypeFilter) {
         if (selectedTypeFilter == null) playlists
@@ -275,7 +279,8 @@ fun PlaylistScreen(
                     PlaylistItemCard(
                         playlistWithTracks = item,
                         onClick = { onSelectPlaylist(item) },
-                        onPlay = { onPlayPlaylist(item) }
+                        onPlay = { onPlayPlaylist(item) },
+                        onDelete = { playlistToDelete = item }
                     )
                 }
             }
@@ -378,6 +383,37 @@ fun PlaylistScreen(
             containerColor = DarkSurface
         )
     }
+
+    // Delete Playlist Confirmation Dialog
+    playlistToDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { playlistToDelete = null },
+            title = { Text("Hapus Playlist?", color = TextPrimary) },
+            text = {
+                Text(
+                    text = "Playlist '${target.playlist.title}' beserta semua daftar lagu di dalamnya akan dihapus secara permanen.",
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeletePlaylist(target.playlist.id)
+                        playlistToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonPink, contentColor = Color.White)
+                ) {
+                    Text("Hapus")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { playlistToDelete = null }) {
+                    Text("Batal", color = TextSecondary)
+                }
+            },
+            containerColor = DarkSurface
+        )
+    }
 }
 
 @Composable
@@ -385,6 +421,7 @@ fun PlaylistItemCard(
     playlistWithTracks: PlaylistWithTracks,
     onClick: () -> Unit,
     onPlay: () -> Unit,
+    onDelete: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -493,7 +530,24 @@ fun PlaylistItemCard(
                 }
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Delete Playlist Button
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier
+                    .size(38.dp)
+                    .testTag("delete_playlist_card_btn_${playlistWithTracks.playlist.id}")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DeleteOutline,
+                    contentDescription = "Hapus Playlist",
+                    tint = TextMuted,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
 
             // Play Button
             Box(

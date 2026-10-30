@@ -1,0 +1,12 @@
+{
+  "entities": {
+    "User": {
+      "path": "users/{userId}",
+      "fields": {
+        "email": { "type": "string", "optional": true },
+        "displayName": { "type": "string", "optional": true },
+        "createdAt": { "type": "timestamp" }
+      }
+    }
+  }
+}

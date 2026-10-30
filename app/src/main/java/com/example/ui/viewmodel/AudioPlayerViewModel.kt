@@ -105,6 +105,9 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private val _currentIndex = MutableStateFlow(0)
     val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
 
+    private val _isQueueVisible = MutableStateFlow(false)
+    val isQueueVisible: StateFlow<Boolean> = _isQueueVisible.asStateFlow()
+
     // Sleep Timer
     private val _sleepTimerSecondsLeft = MutableStateFlow<Int?>(null)
     val sleepTimerSecondsLeft: StateFlow<Int?> = _sleepTimerSecondsLeft.asStateFlow()
@@ -612,6 +615,83 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val prevTrack = queue[prevIndex]
         engine.playTrack(prevTrack)
         recordTrackPlay(prevTrack)
+    }
+
+    // Queue / Playlist controls & reordering
+    fun setQueueVisible(visible: Boolean) {
+        _isQueueVisible.value = visible
+    }
+
+    fun reorderQueue(fromIndex: Int, toIndex: Int) {
+        val list = _playQueue.value.toMutableList()
+        if (fromIndex !in list.indices || toIndex !in list.indices || fromIndex == toIndex) return
+        val currentPlaying = currentTrack.value
+        val item = list.removeAt(fromIndex)
+        list.add(toIndex, item)
+        _playQueue.value = list
+
+        if (currentPlaying != null) {
+            val newIdx = list.indexOfFirst { it.id == currentPlaying.id }
+            if (newIdx >= 0) {
+                _currentIndex.value = newIdx
+            }
+        }
+    }
+
+    fun removeFromQueue(index: Int) {
+        val list = _playQueue.value.toMutableList()
+        if (index !in list.indices) return
+        val removed = list.removeAt(index)
+        val currentPlaying = currentTrack.value
+        _playQueue.value = list
+
+        if (currentPlaying?.id == removed.id) {
+            if (list.isNotEmpty()) {
+                val nextIdx = index.coerceIn(0, list.size - 1)
+                _currentIndex.value = nextIdx
+                val nextTrack = list[nextIdx]
+                engine.playTrack(nextTrack)
+                recordTrackPlay(nextTrack)
+            } else {
+                engine.pause()
+                _currentIndex.value = 0
+            }
+        } else if (currentPlaying != null) {
+            _currentIndex.value = list.indexOfFirst { it.id == currentPlaying.id }.coerceAtLeast(0)
+        }
+    }
+
+    fun playTrackFromQueue(index: Int) {
+        val list = _playQueue.value
+        if (index in list.indices) {
+            _currentIndex.value = index
+            val track = list[index]
+            engine.playTrack(track)
+            recordTrackPlay(track)
+        }
+    }
+
+    fun shuffleQueue() {
+        val list = _playQueue.value
+        if (list.size <= 1) return
+        val current = currentTrack.value
+        val others = if (current != null) list.filter { it.id != current.id }.shuffled() else list.shuffled()
+        val newList = if (current != null) listOf(current) + others else others
+        _playQueue.value = newList
+        _currentIndex.value = 0
+        _userMessage.value = "Urutan antrean diacak"
+    }
+
+    fun clearQueue() {
+        val current = currentTrack.value
+        if (current != null) {
+            _playQueue.value = listOf(current)
+            _currentIndex.value = 0
+        } else {
+            _playQueue.value = emptyList()
+            _currentIndex.value = 0
+        }
+        _userMessage.value = "Antrean direset ke lagu yang sedang diputar"
     }
 
     fun togglePlayPause() = engine.togglePlayPause()

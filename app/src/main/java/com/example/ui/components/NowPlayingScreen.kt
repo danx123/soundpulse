@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -127,6 +128,7 @@ fun NowPlayingScreen(
     onShowTrackDetails: (AudioTrack) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onOpenLyrics: () -> Unit = {},
+    onOpenQueue: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler {
@@ -275,6 +277,19 @@ fun NowPlayingScreen(
                     }
 
                     Row {
+                        IconButton(
+                            onClick = onOpenQueue,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .testTag("now_playing_queue_btn_top")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QueueMusic,
+                                contentDescription = "Daftar Putar",
+                                tint = aura.dominant
+                            )
+                        }
+
                         IconButton(
                             onClick = { showTimerDialog = true },
                             modifier = Modifier.size(40.dp)
@@ -700,6 +715,34 @@ fun NowPlayingScreen(
                             color = TextPrimary,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                         )
+                    }
+
+                    // Playlist / Queue button
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { onOpenQueue() }
+                            .testTag("now_playing_queue_btn"),
+                        color = DarkSurfaceVariant,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, aura.dominant.copy(alpha = 0.6f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QueueMusic,
+                                contentDescription = "Daftar Putar",
+                                tint = aura.dominant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Antrean",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                color = TextPrimary
+                            )
+                        }
                     }
 
                     // Favorite button

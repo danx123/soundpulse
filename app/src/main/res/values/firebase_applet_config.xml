@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<resources>
+    <string name="firestore_database_id" translatable="false">ai-studio-android-soundpul-0734466e-cec7-45e4-b5b8-b112773b94c9</string>
+    <string name="recaptcha_site_key" translatable="false">6LfSfQcuAAAAANTfVvMpILJRs7OnkD5i-5ZEKQw3</string>
+</resources>

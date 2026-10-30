@@ -69,10 +69,16 @@ class GoogleAuthManager(context: Context) {
         get() = firebaseReady && webClientId() != null
 
     init {
+        refreshConfig()
+    }
+
+    fun refreshConfig() {
         try {
             if (isConfigured) {
                 val auth = FirebaseAuth.getInstance()
-                _state.value = auth.currentUser?.let { AuthState.SignedIn(it.toAuthUser()) } ?: AuthState.SignedOut
+                if (_state.value is AuthState.Unconfigured || _state.value is AuthState.SignedOut) {
+                    _state.value = auth.currentUser?.let { AuthState.SignedIn(it.toAuthUser()) } ?: AuthState.SignedOut
+                }
                 auth.addAuthStateListener { a ->
                     val user = a.currentUser
                     if (user != null) {
@@ -81,6 +87,8 @@ class GoogleAuthManager(context: Context) {
                         _state.value = AuthState.SignedOut
                     }
                 }
+            } else {
+                _state.value = AuthState.Unconfigured
             }
         } catch (e: Throwable) {
             Log.w(TAG, "Gagal menginisialisasi Auth: ${e.message}")
@@ -92,6 +100,7 @@ class GoogleAuthManager(context: Context) {
      * @return pesan error untuk ditampilkan, atau null bila sukses / dibatalkan pengguna.
      */
     suspend fun signIn(activityContext: Context): String? {
+        refreshConfig()
         val clientId = webClientId()
         if (!firebaseReady || clientId == null) {
             _state.value = AuthState.Unconfigured

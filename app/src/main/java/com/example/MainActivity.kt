@@ -76,11 +76,13 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.AboutDialog
 import com.example.ui.components.AddToPlaylistDialog
+import com.example.ui.components.CurrentQueueSheet
 import com.example.ui.components.FolderLoadedPlaylistDialog
 import com.example.ui.components.LyricsScreen
 import com.example.ui.components.MiniPlayer
 import com.example.ui.components.NowPlayingScreen
 import com.example.ui.components.TrackDetailsDialog
+import com.example.util.configureAppCheck
 import com.example.ui.screens.AiHubScreen
 import com.example.ui.screens.CloudScreen
 import com.example.ui.screens.EqualizerScreen
@@ -104,6 +106,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        configureAppCheck(this, intent)
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
@@ -142,6 +145,8 @@ fun SoundPulseMainScreen(
     val selectedTrackForDetails by viewModel.selectedTrackForDetails.collectAsState()
     val selectedPlaylistDetail by viewModel.selectedPlaylistDetail.collectAsState()
     val trackToAddToPlaylist by viewModel.trackToAddToPlaylist.collectAsState()
+    val isQueueVisible by viewModel.isQueueVisible.collectAsState()
+    val playQueue by viewModel.playQueue.collectAsState()
     val userMessage by viewModel.userMessage.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
 
@@ -449,7 +454,8 @@ fun SoundPulseMainScreen(
                     onPlayPlaylist = { p -> viewModel.playPlaylist(p) },
                     onCreatePlaylist = { title, desc, type ->
                         viewModel.createPlaylist(title, desc, type)
-                    }
+                    },
+                    onDeletePlaylist = { id -> viewModel.deletePlaylist(id) }
                 )
 
                 MainTab.AI_HUB -> AiHubScreen(
@@ -568,7 +574,8 @@ fun SoundPulseMainScreen(
             },
             onShowTrackDetails = { track -> viewModel.showTrackDetails(track) },
             onToggleFavorite = { id -> viewModel.toggleFavorite(id) },
-            onOpenLyrics = { viewModel.openLyrics() }
+            onOpenLyrics = { viewModel.openLyrics() },
+            onOpenQueue = { viewModel.setQueueVisible(true) }
         )
     }
 
@@ -626,6 +633,21 @@ fun SoundPulseMainScreen(
         TrackDetailsDialog(
             track = track,
             onDismiss = { viewModel.showTrackDetails(null) }
+        )
+    }
+
+    // Modal Sheet Antrean / Daftar Putar dengan dukungan drag reorder
+    if (isQueueVisible) {
+        CurrentQueueSheet(
+            queue = playQueue,
+            currentTrack = currentTrack,
+            isPlaying = isPlaying,
+            onDismiss = { viewModel.setQueueVisible(false) },
+            onPlayTrackAtIndex = { idx -> viewModel.playTrackFromQueue(idx) },
+            onRemoveFromQueue = { idx -> viewModel.removeFromQueue(idx) },
+            onReorderQueue = { from, to -> viewModel.reorderQueue(from, to) },
+            onShuffleQueue = { viewModel.shuffleQueue() },
+            onClearQueue = { viewModel.clearQueue() }
         )
     }
 
