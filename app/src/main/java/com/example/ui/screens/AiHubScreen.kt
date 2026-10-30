@@ -33,6 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -56,10 +57,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.data.auth.AuthState
 import com.example.data.local.entity.TrackStatEntity
 import com.example.data.model.AiMusicRecommendation
 import com.example.data.model.AudioTrack
 import com.example.data.model.SmartPlaylist
+import com.example.ui.components.AiAuthCard
 import com.example.ui.components.AppFooterCard
 import com.example.ui.components.FormatBadge
 import com.example.ui.components.formatTime
@@ -87,6 +90,10 @@ fun AiHubScreen(
     onPlaySmartPlaylist: (SmartPlaylist) -> Unit,
     onPlayTrack: (AudioTrack) -> Unit,
     onGenerateCustomAiMix: (prompt: String) -> Unit,
+    authState: AuthState = AuthState.SignedOut,
+    isAiMixLoading: Boolean = false,
+    onSignInWithGoogle: () -> Unit = {},
+    onSignOut: () -> Unit = {},
     onAboutClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -165,6 +172,16 @@ fun AiHubScreen(
             }
         }
 
+        // Login Google untuk AI DJ Gemini (tanpa API key)
+        item {
+            AiAuthCard(
+                authState = authState,
+                onSignIn = onSignInWithGoogle,
+                onSignOut = onSignOut,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+
         // Custom AI Prompt Generator Input
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -206,11 +223,20 @@ fun AiHubScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = DarkBg),
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+                        enabled = !isAiMixLoading,
                         modifier = Modifier.testTag("generate_ai_mix_btn")
                     ) {
-                        Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Mix", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        if (isAiMixLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = DarkBg,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Mix", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
                     }
                 }
             }
