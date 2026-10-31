@@ -101,7 +101,7 @@
     <string name="about">About</string>
     <string name="about_title">About SoundPulse</string>
     <string name="about_tagline">Next-Gen Audiophile &amp; AI-Driven Sound Engine</string>
-    <string name="about_version">v1.3.5 Pro Studio Edition</string>
+    <string name="about_version">v1.4.0 Pro Studio Edition</string>
     <string name="scan_device_audio">Scan Device Audio (Android 9+)</string>
     <string name="play_from_folder">Play from Folder</string>
     <string name="folder_loaded_title">Folder Loaded (%1$d Tracks)</string>
