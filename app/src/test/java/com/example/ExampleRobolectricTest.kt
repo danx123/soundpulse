@@ -74,6 +74,8 @@ class ExampleRobolectricTest {
     val defaultEq = EqualizerState()
     assertTrue("ReplayGain harus aktif secara default", defaultEq.isReplayGainEnabled)
     assertEquals(6.0f, defaultEq.replayGainTargetDb, 0.01f)
+    assertTrue("Fade In/Out harus aktif secara default", defaultEq.isFadeInOutEnabled)
+    assertEquals(2.0f, defaultEq.fadeDurationSeconds, 0.01f)
   }
 
   @Test

@@ -140,4 +140,10 @@
     <string name="eq_normalization_desc">Balances loudness across all tracks automatically so quiet and loud tracks play at a uniform, comfortable volume.</string>
     <string name="eq_normalization_target_gain">Target Loudness: +%1$.1f dB</string>
     <string name="eq_normalization_active">Standard EBU R128 Active</string>
+
+    <!-- Equalizer Fade In / Out -->
+    <string name="eq_fade_title">Fade In / Out Transitions</string>
+    <string name="eq_fade_desc">Applies smooth volume ramping when starting, pausing, or changing tracks to eliminate abrupt audio cuts.</string>
+    <string name="eq_fade_duration">Duration: %1$.1f s</string>
+    <string name="eq_fade_active">Smooth Transition Active</string>
 </resources>

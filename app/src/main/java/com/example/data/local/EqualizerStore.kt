@@ -33,7 +33,9 @@ class EqualizerStore(context: Context) {
             virtualizerStrength = prefs.getInt(KEY_VIRTUALIZER, defaults.virtualizerStrength).coerceIn(0, 1000),
             reverbEffect = prefs.getString(KEY_REVERB, defaults.reverbEffect) ?: defaults.reverbEffect,
             isReplayGainEnabled = prefs.getBoolean(KEY_REPLAYGAIN_ENABLED, defaults.isReplayGainEnabled),
-            replayGainTargetDb = prefs.getFloat(KEY_REPLAYGAIN_TARGET, defaults.replayGainTargetDb).coerceIn(0f, 12f)
+            replayGainTargetDb = prefs.getFloat(KEY_REPLAYGAIN_TARGET, defaults.replayGainTargetDb).coerceIn(0f, 12f),
+            isFadeInOutEnabled = prefs.getBoolean(KEY_FADE_ENABLED, defaults.isFadeInOutEnabled),
+            fadeDurationSeconds = prefs.getFloat(KEY_FADE_DURATION, defaults.fadeDurationSeconds).coerceIn(0.5f, 5.0f)
         )
     }
 
@@ -47,6 +49,8 @@ class EqualizerStore(context: Context) {
             .putString(KEY_REVERB, state.reverbEffect)
             .putBoolean(KEY_REPLAYGAIN_ENABLED, state.isReplayGainEnabled)
             .putFloat(KEY_REPLAYGAIN_TARGET, state.replayGainTargetDb)
+            .putBoolean(KEY_FADE_ENABLED, state.isFadeInOutEnabled)
+            .putFloat(KEY_FADE_DURATION, state.fadeDurationSeconds)
             .apply()
     }
 
@@ -60,5 +64,7 @@ class EqualizerStore(context: Context) {
         const val KEY_REVERB = "reverb"
         const val KEY_REPLAYGAIN_ENABLED = "replaygain_enabled"
         const val KEY_REPLAYGAIN_TARGET = "replaygain_target"
+        const val KEY_FADE_ENABLED = "fade_enabled"
+        const val KEY_FADE_DURATION = "fade_duration"
     }
 }

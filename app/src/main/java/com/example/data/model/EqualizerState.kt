@@ -33,7 +33,9 @@ data class EqualizerState(
     val virtualizerStrength: Int = 400,     // 0 to 1000
     val reverbEffect: String = "None",
     val isReplayGainEnabled: Boolean = true,
-    val replayGainTargetDb: Float = 6.0f
+    val replayGainTargetDb: Float = 6.0f,
+    val isFadeInOutEnabled: Boolean = true,
+    val fadeDurationSeconds: Float = 2.0f
 ) {
     companion object {
         fun defaultBands(): List<EqualizerBand> = listOf(

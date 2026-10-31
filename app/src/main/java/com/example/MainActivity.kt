@@ -538,7 +538,9 @@ fun SoundPulseMainScreen(
                     onApplyPreset = { preset -> viewModel.applyPreset(preset) },
                     onSetReverb = { reverb -> viewModel.setReverb(reverb) },
                     onReplayGainToggle = { viewModel.setReplayGainEnabled(it) },
-                    onReplayGainTargetChange = { viewModel.setReplayGainTargetDb(it) }
+                    onReplayGainTargetChange = { viewModel.setReplayGainTargetDb(it) },
+                    onFadeInOutToggle = { viewModel.setFadeInOutEnabled(it) },
+                    onFadeDurationChange = { viewModel.setFadeDurationSeconds(it) }
                 )
             }
         }

@@ -140,4 +140,10 @@
     <string name="eq_normalization_desc">Menyamakan tingkat kenyaringan audio antar lagu secara otomatis agar volume lagu yang bersuara kecil dan besar tetap seimbang dan rata.</string>
     <string name="eq_normalization_target_gain">Tingkat Penguatan: +%1$.1f dB</string>
     <string name="eq_normalization_active">Standar Normalisasi EBU R128 Aktif</string>
+
+    <!-- Equalizer Fade In / Out -->
+    <string name="eq_fade_title">Transisi Fade In / Out</string>
+    <string name="eq_fade_desc">Menerapkan transisi volume yang lembut saat memutar, menjeda, atau berganti lagu untuk mencegah suara terputus mendadak.</string>
+    <string name="eq_fade_duration">Durasi: %1$.1f dtk</string>
+    <string name="eq_fade_active">Transisi Halus Aktif</string>
 </resources>

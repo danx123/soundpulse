@@ -48,6 +48,7 @@ class AudioPlayerEngine(
     private var hardwareReverb: PresetReverb? = null
     private var reverbPlayer: MediaPlayer? = null
     private var hardwareLoudnessEnhancer: LoudnessEnhancer? = null
+    private var fadeJob: Job? = null
 
     private val visualizerSimulator = VisualizerSimulator()
 
@@ -214,6 +215,7 @@ class AudioPlayerEngine(
                             applyPlaybackSpeedInternal(_playbackSpeed.value)
                             mp.start()
                             _isPlaying.value = true
+                            performFadeIn(mp)
                             onTrackStartedListener?.invoke(track, dur)
                         }
                     }
@@ -278,23 +280,28 @@ class AudioPlayerEngine(
         }
         try {
             if (player.isPlaying) {
-                player.pause()
-                _isPlaying.value = false
+                performFadeOutAndPause(player)
             } else {
                 player.start()
                 _isPlaying.value = true
+                performFadeIn(player)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error toggling play/pause", e)
         }
     }
 
-    fun pause() {
+    fun pause(immediate: Boolean = false) {
         try {
             mediaPlayer?.let {
                 if (it.isPlaying) {
-                    it.pause()
-                    _isPlaying.value = false
+                    if (immediate || !_equalizerState.value.isFadeInOutEnabled) {
+                        fadeJob?.cancel()
+                        it.pause()
+                        _isPlaying.value = false
+                    } else {
+                        performFadeOutAndPause(it)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -562,15 +569,99 @@ class AudioPlayerEngine(
         val p = player ?: return
         val state = _equalizerState.value
         try {
-            if (state.isEnabled && state.isReplayGainEnabled) {
-                // Headroom 0.95f untuk mencegah distorsi puncak saat penguatan dinamis aktif
-                val vol = 0.95f
-                p.setVolume(vol, vol)
-            } else {
-                p.setVolume(1.0f, 1.0f)
-            }
+            val vol = targetTrackVolume()
+            p.setVolume(vol, vol)
         } catch (e: Exception) {
             Log.w(TAG, "Error applying track volume normalization", e)
+        }
+    }
+
+    private fun targetTrackVolume(): Float {
+        val state = _equalizerState.value
+        return if (state.isEnabled && state.isReplayGainEnabled) 0.95f else 1.0f
+    }
+
+    fun setFadeInOutEnabled(enabled: Boolean) {
+        _equalizerState.value = _equalizerState.value.copy(isFadeInOutEnabled = enabled)
+        persistEqualizer()
+    }
+
+    fun setFadeDurationSeconds(seconds: Float) {
+        val clamped = seconds.coerceIn(0.5f, 5.0f)
+        _equalizerState.value = _equalizerState.value.copy(fadeDurationSeconds = clamped)
+        persistEqualizer()
+    }
+
+    private fun performFadeIn(player: MediaPlayer) {
+        val state = _equalizerState.value
+        val targetVol = targetTrackVolume()
+        if (!state.isFadeInOutEnabled) {
+            try { player.setVolume(targetVol, targetVol) } catch (_: Exception) {}
+            return
+        }
+
+        fadeJob?.cancel()
+        val durationMs = (state.fadeDurationSeconds * 1000).toLong().coerceIn(300L, 5000L)
+        val steps = (durationMs / 40).coerceAtLeast(1)
+        val stepDelta = targetVol / steps
+
+        fadeJob = scope.launch(Dispatchers.Main) {
+            try {
+                player.setVolume(0f, 0f)
+                var currentVol = 0f
+                for (i in 1..steps) {
+                    if (!isActive || mediaPlayer != player || !_isPlaying.value) break
+                    delay(40)
+                    currentVol = (currentVol + stepDelta).coerceAtMost(targetVol)
+                    try { player.setVolume(currentVol, currentVol) } catch (_: Exception) {}
+                }
+                if (mediaPlayer == player && _isPlaying.value) {
+                    player.setVolume(targetVol, targetVol)
+                }
+            } catch (e: Exception) {
+                try { player.setVolume(targetVol, targetVol) } catch (_: Exception) {}
+            }
+        }
+    }
+
+    private fun performFadeOutAndPause(player: MediaPlayer) {
+        val state = _equalizerState.value
+        if (!state.isFadeInOutEnabled) {
+            try {
+                player.pause()
+                _isPlaying.value = false
+            } catch (e: Exception) {
+                Log.e(TAG, "Error pausing", e)
+            }
+            return
+        }
+
+        fadeJob?.cancel()
+        val durationMs = (state.fadeDurationSeconds * 1000).toLong().coerceIn(300L, 2500L)
+        val steps = (durationMs / 30).coerceAtLeast(1)
+        val startVol = targetTrackVolume()
+        val stepDelta = startVol / steps
+
+        fadeJob = scope.launch(Dispatchers.Main) {
+            try {
+                var currentVol = startVol
+                for (i in 1..steps) {
+                    if (!isActive || mediaPlayer != player) break
+                    delay(30)
+                    currentVol = (currentVol - stepDelta).coerceAtLeast(0f)
+                    try { player.setVolume(currentVol, currentVol) } catch (_: Exception) {}
+                }
+                if (mediaPlayer == player) {
+                    player.pause()
+                    _isPlaying.value = false
+                    player.setVolume(startVol, startVol)
+                }
+            } catch (e: Exception) {
+                try {
+                    player.pause()
+                    _isPlaying.value = false
+                } catch (_: Exception) {}
+            }
         }
     }
 
@@ -599,6 +690,7 @@ class AudioPlayerEngine(
 
     private fun releaseMediaPlayerLocked() {
         try {
+            fadeJob?.cancel()
             releaseVisualizer()
             releaseAudioEffects()
             mediaPlayer?.let {

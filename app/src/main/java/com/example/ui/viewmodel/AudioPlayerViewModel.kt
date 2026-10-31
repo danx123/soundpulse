@@ -759,6 +759,10 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun setReplayGainTargetDb(targetDb: Float) = engine.setReplayGainTargetDb(targetDb)
 
+    fun setFadeInOutEnabled(enabled: Boolean) = engine.setFadeInOutEnabled(enabled)
+
+    fun setFadeDurationSeconds(seconds: Float) = engine.setFadeDurationSeconds(seconds)
+
     // Sleep timer
     fun setSleepTimer(minutes: Int) {
         sleepTimerJob?.cancel()

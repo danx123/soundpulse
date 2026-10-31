@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Equalizer
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SurroundSound
@@ -85,6 +86,8 @@ fun EqualizerScreen(
     onSetReverb: (String) -> Unit,
     onReplayGainToggle: (Boolean) -> Unit = {},
     onReplayGainTargetChange: (Float) -> Unit = {},
+    onFadeInOutToggle: (Boolean) -> Unit = {},
+    onFadeDurationChange: (Float) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val presets = EqualizerState.PRESETS
@@ -467,6 +470,151 @@ fun EqualizerScreen(
                         Text(text = "0 dB (Halus)", fontSize = 10.sp, color = TextMuted)
                         Text(text = "+6 dB (Standar)", fontSize = 10.sp, color = NeonCyan)
                         Text(text = "+12 dB (Maksimal)", fontSize = 10.sp, color = TextMuted)
+                    }
+                }
+            }
+        }
+
+        // Fade In / Out Smooth Transitions Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("fade_in_out_card"),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            border = androidx.compose.foundation.BorderStroke(0.5.dp, DarkCardBorder)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(
+                                    if (state.isEnabled && state.isFadeInOutEnabled)
+                                        NeonPurple.copy(alpha = 0.2f)
+                                    else
+                                        DarkSurfaceVariant,
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.GraphicEq,
+                                contentDescription = null,
+                                tint = if (state.isEnabled && state.isFadeInOutEnabled) NeonPurple else TextMuted,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = stringResource(R.string.eq_fade_title),
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = TextPrimary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = if (state.isEnabled && state.isFadeInOutEnabled) NeonPurple.copy(alpha = 0.2f) else DarkSurfaceVariant
+                                ) {
+                                    Text(
+                                        text = "FADE",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = if (state.isEnabled && state.isFadeInOutEnabled) NeonPurple else TextMuted,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = if (state.isEnabled && state.isFadeInOutEnabled)
+                                    stringResource(R.string.eq_fade_active)
+                                else
+                                    "Nonaktif",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (state.isEnabled && state.isFadeInOutEnabled) HighResGreen else TextMuted
+                            )
+                        }
+                    }
+
+                    Switch(
+                        checked = state.isFadeInOutEnabled,
+                        onCheckedChange = onFadeInOutToggle,
+                        enabled = state.isEnabled,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = DarkBg,
+                            checkedTrackColor = NeonPurple,
+                            uncheckedThumbColor = TextMuted,
+                            uncheckedTrackColor = DarkSurfaceVariant
+                        ),
+                        modifier = Modifier.testTag("fade_switch")
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = stringResource(R.string.eq_fade_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    lineHeight = 16.sp
+                )
+
+                if (state.isFadeInOutEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Durasi Transisi Fade",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TextSecondary
+                        )
+                        Text(
+                            text = stringResource(R.string.eq_fade_duration, state.fadeDurationSeconds),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = NeonPurple
+                        )
+                    }
+
+                    Slider(
+                        value = ((state.fadeDurationSeconds - 0.5f) / 4.5f).coerceIn(0f, 1f),
+                        onValueChange = { norm ->
+                            val seconds = 0.5f + (norm * 4.5f)
+                            onFadeDurationChange(seconds)
+                        },
+                        enabled = state.isEnabled,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("fade_duration_slider"),
+                        colors = SliderDefaults.colors(
+                            thumbColor = NeonPurple,
+                            activeTrackColor = NeonPurple,
+                            inactiveTrackColor = DarkSurfaceVariant
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "0.5 s (Cepat)", fontSize = 10.sp, color = TextMuted)
+                        Text(text = "2.0 s (Standar)", fontSize = 10.sp, color = NeonPurple)
+                        Text(text = "5.0 s (Lembut)", fontSize = 10.sp, color = TextMuted)
                     }
                 }
             }
