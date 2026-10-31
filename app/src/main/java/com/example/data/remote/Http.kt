@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
  * - lainnya / jaringan putus -> IOException (kegagalan sementara, jangan di-cache sebagai "tidak ada")
  */
 object Http {
-    private const val USER_AGENT = "SoundPulse/1.4.1 (https://github.com/danx123/soundpulse)"
+    private const val USER_AGENT = "SoundPulse/1.4.2 (https://github.com/danx123/soundpulse)"
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
