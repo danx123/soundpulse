@@ -25,17 +25,21 @@ object Http {
             .build()
     }
 
-    suspend fun getString(url: String): String? =
-        withContext(Dispatchers.IO) { fetch(url)?.toString(Charsets.UTF_8) }
+    suspend fun getString(url: String, customHeaders: Map<String, String>? = null): String? =
+        withContext(Dispatchers.IO) { fetch(url, customHeaders)?.toString(Charsets.UTF_8) }
 
-    suspend fun getBytes(url: String): ByteArray? =
-        withContext(Dispatchers.IO) { fetch(url) }
+    suspend fun getBytes(url: String, customHeaders: Map<String, String>? = null): ByteArray? =
+        withContext(Dispatchers.IO) { fetch(url, customHeaders) }
 
-    private fun fetch(url: String): ByteArray? {
-        val request = Request.Builder()
-            .url(url)
-            .header("User-Agent", USER_AGENT)
-            .build()
+    private fun fetch(url: String, customHeaders: Map<String, String>? = null): ByteArray? {
+        val builder = Request.Builder().url(url)
+        if (customHeaders != null && customHeaders.containsKey("User-Agent")) {
+            customHeaders.forEach { (k, v) -> builder.header(k, v) }
+        } else {
+            builder.header("User-Agent", USER_AGENT)
+            customHeaders?.forEach { (k, v) -> builder.header(k, v) }
+        }
+        val request = builder.build()
         return client.newCall(request).execute().use { response ->
             when {
                 response.code == 404 -> null

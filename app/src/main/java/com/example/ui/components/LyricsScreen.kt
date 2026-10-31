@@ -1,7 +1,11 @@
 package com.example.ui.components
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -52,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -93,6 +98,16 @@ fun LyricsScreen(
     if (track == null) return
 
     val aura = rememberDynamicAura(track)
+    val isLoading = state is LyricsUiState.Loading
+    val infiniteTransition = rememberInfiniteTransition(label = "spin")
+    val spinAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing)
+        ),
+        label = "spinAngle"
+    )
 
     Surface(
         modifier = modifier
@@ -165,8 +180,13 @@ fun LyricsScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        val statusSubtitle = when (state) {
+                            is LyricsUiState.Success -> "${track.artist} • ${state.data.source}"
+                            is LyricsUiState.Loading -> "${track.artist} • Memuat lirik…"
+                            else -> track.artist
+                        }
                         Text(
-                            text = track.artist,
+                            text = statusSubtitle,
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary,
                             maxLines = 1,
@@ -176,6 +196,7 @@ fun LyricsScreen(
 
                     IconButton(
                         onClick = onRetry,
+                        enabled = !isLoading,
                         modifier = Modifier
                             .size(44.dp)
                             .testTag("lyrics_refresh_btn")
@@ -183,7 +204,8 @@ fun LyricsScreen(
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Muat ulang lirik",
-                            tint = TextSecondary
+                            tint = if (isLoading) aura.dominant else TextSecondary,
+                            modifier = Modifier.rotate(if (isLoading) spinAngle else 0f)
                         )
                     }
                 }
@@ -214,8 +236,8 @@ fun LyricsScreen(
 
                         is LyricsUiState.NotFound -> MessageBlock(
                             title = "Lirik tidak ditemukan",
-                            message = "Lirik untuk lagu ini belum tersedia. Pastikan judul dan artis pada tag lagu sudah benar.",
-                            actionLabel = "Coba Lagi",
+                            message = "Lirik untuk lagu ini belum ditemukan di LRCLIB maupun Musixmatch. Pastikan judul dan artis lagu sudah benar, lalu klik coba lagi.",
+                            actionLabel = "Coba Lagi (Re-fetch)",
                             accent = aura.dominant,
                             onAction = onRetry
                         )
@@ -304,7 +326,7 @@ private fun LyricsContent(
 ) {
     when {
         data.isSynced -> SyncedLyrics(
-            lines = data.syncedLines,
+            data = data,
             positionMs = positionMs,
             accent = accent,
             onSeekTo = onSeekTo
@@ -317,7 +339,7 @@ private fun LyricsContent(
                 .padding(horizontal = 28.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            SourceChip(label = "Tanpa sinkronisasi • ${data.source}", accent = accent)
+            SourceChip(label = "Teks • ${data.source}", accent = accent)
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = data.plainText,
@@ -341,11 +363,12 @@ private fun LyricsContent(
 
 @Composable
 private fun SyncedLyrics(
-    lines: List<LyricLine>,
+    data: LyricsData,
     positionMs: Long,
     accent: Color,
     onSeekTo: (Long) -> Unit
 ) {
+    val lines = data.syncedLines
     val listState = rememberLazyListState()
     // Sedikit lookahead supaya baris berganti tepat sebelum vokal masuk
     val activeIndex = remember(lines, positionMs) {
@@ -363,14 +386,26 @@ private fun SyncedLyrics(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 220.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 220.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                SourceChip(label = "Lirik Sinkron • ${data.source}", accent = accent)
+            }
+        }
+
         itemsIndexed(lines) { index, line ->
             LyricLineItem(
                 text = line.text,
                 isActive = index == activeIndex,
                 distance = if (activeIndex < 0) 2 else abs(index - activeIndex),
+                accent = accent,
                 onClick = { onSeekTo(line.timeMs) }
             )
         }
@@ -382,30 +417,39 @@ private fun LyricLineItem(
     text: String,
     isActive: Boolean,
     distance: Int,
+    accent: Color,
     onClick: () -> Unit
 ) {
     val targetAlpha = when {
         isActive -> 1f
-        distance == 1 -> 0.65f
-        distance == 2 -> 0.5f
-        else -> 0.38f
+        distance == 1 -> 0.70f
+        distance == 2 -> 0.50f
+        else -> 0.35f
     }
-    val alpha by animateFloatAsState(targetAlpha, tween(300), label = "lyricAlpha")
-    val size by animateFloatAsState(if (isActive) 26f else 20f, tween(300), label = "lyricSize")
+    val alpha by animateFloatAsState(targetAlpha, tween(250), label = "lyricAlpha")
+    val size by animateFloatAsState(if (isActive) 25f else 19f, tween(250), label = "lyricSize")
 
-    Text(
-        text = text.ifBlank { "♪" },
-        fontSize = size.sp,
-        lineHeight = (size * 1.35f).sp,
-        fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.SemiBold,
-        color = TextPrimary.copy(alpha = alpha),
-        textAlign = TextAlign.Center,
+    val textColor = if (isActive) accent else TextPrimary.copy(alpha = alpha)
+    val bgColor = if (isActive) accent.copy(alpha = 0.12f) else Color.Transparent
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
+            .background(bgColor)
             .clickable { onClick() }
-            .padding(vertical = 10.dp, horizontal = 8.dp)
-    )
+            .padding(vertical = 8.dp, horizontal = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text.ifBlank { "♪" },
+            fontSize = size.sp,
+            lineHeight = (size * 1.35f).sp,
+            fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.SemiBold,
+            color = textColor,
+            textAlign = TextAlign.Center
+        )
+    }
 }
 
 @Composable

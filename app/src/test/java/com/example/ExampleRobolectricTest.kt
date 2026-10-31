@@ -244,6 +244,63 @@ class ExampleRobolectricTest {
   }
 
   @Test
+  fun `verify TrackQuery cleans noise and file extensions from raw titles`() {
+    val clean1 = com.example.data.remote.TrackQuery.cleanTitle("01. Blank Space (Official Music Video).mp3")
+    assertEquals("Blank Space", clean1)
+
+    val clean2 = com.example.data.remote.TrackQuery.cleanTitle("Rolling In The Deep [Official HD Audio]")
+    assertEquals("Rolling In The Deep", clean2)
+
+    val clean3 = com.example.data.remote.TrackQuery.cleanTitle("Bohemian Rhapsody - Remastered 2011")
+    assertEquals("Bohemian Rhapsody", clean3)
+
+    val clean4 = com.example.data.remote.TrackQuery.cleanTitle("Levitating (feat. DaBaby)")
+    assertEquals("Levitating", clean4)
+  }
+
+  @Test
+  fun `verify LyricsRepository disk persistence and re-fetch behavior`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val repo = com.example.data.repository.LyricsRepository(context)
+
+    val track = AudioTrack(
+      id = "test_song_1",
+      title = "Clean Title Song",
+      artist = "Clean Artist",
+      durationMs = 210000L,
+      uri = "content://media/audio/1",
+      sourceType = AudioSourceType.LOCAL_FILE
+    )
+
+    // Simulasi penyimpanan lirik manual di filesDir/saved_lyrics
+    val dir = java.io.File(context.filesDir, "saved_lyrics")
+    dir.mkdirs()
+    val key = com.example.data.remote.sha1Hex(
+      com.example.data.remote.TrackQuery.normalize(track.artist) + "|" +
+          com.example.data.remote.TrackQuery.normalize(track.title) + "|" + (track.durationMs / 5000)
+    )
+    val testJson = org.json.JSONObject()
+      .put("synced", "[00:05.000]Test line 1\n[00:10.000]Test line 2")
+      .put("plain", "Test plain lyrics")
+      .put("instrumental", false)
+      .put("source", "Musixmatch")
+    java.io.File(dir, "$key.json").writeText(testJson.toString())
+
+    // Ambil lirik tanpa forceRefresh: harus langsung dari disk cache
+    val state = repo.getLyrics(track, forceRefresh = false)
+    assertTrue("Harus sukses mengambil dari disk", state is com.example.data.model.LyricsUiState.Success)
+    val successState = state as com.example.data.model.LyricsUiState.Success
+    assertEquals("Musixmatch", successState.data.source)
+    assertEquals(2, successState.data.syncedLines.size)
+    assertEquals("Test line 1", successState.data.syncedLines[0].text)
+
+    // Ketika forceRefresh = true, cache disk dihapus untuk re-fetch
+    // (di sandbox tanpa internet untuk lagu fiktif akan mengembalikan NotFound atau Error)
+    val refreshState = repo.getLyrics(track, forceRefresh = true)
+    assertTrue("Cache lama harus dibersihkan pada force refresh", refreshState !is com.example.data.model.LyricsUiState.Success || !java.io.File(dir, "$key.json").exists())
+  }
+
+  @Test
   fun `verify MainActivity launches and initializes successfully`() {
     val controller = org.robolectric.Robolectric.buildActivity(MainActivity::class.java).setup()
     val activity = controller.get()

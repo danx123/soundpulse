@@ -29,11 +29,35 @@ data class TrackQuery(val title: String, val artist: String?) {
         private val LEADING_NUMBER = Regex("^\\s*\\d{1,3}\\s*[-._)]\\s*")
         private val BRACKETS = Regex("\\(.*?\\)|\\[.*?]")
 
+        private val FILE_EXT = Regex("\\.(mp3|flac|wav|m4a|aac|ogg|opus)$", RegexOption.IGNORE_CASE)
+        private val NOISE_PATTERNS = Regex(
+            "\\s*[\\[(](?:official|video|lyrics?|remaster(?:ed)?|audio|hd|4k|hq|live|visualizer|deluxe|bonus|version|feat|ft|featuring).*?[\\])]",
+            RegexOption.IGNORE_CASE
+        )
+        private val DASH_NOISE = Regex(
+            "\\s*-\\s*(?:remaster(?:ed)?|live|mono|stereo|bonus|deluxe|official).*$",
+            RegexOption.IGNORE_CASE
+        )
+        private val FEAT_TRAILING = Regex("\\s*[\\[(]?\\b(?:feat|ft|featuring)\\b.*$", RegexOption.IGNORE_CASE)
+
         fun isUnknownArtist(artist: String?): Boolean =
             artist == null || artist.trim().lowercase() in UNKNOWN_ARTISTS
 
+        fun cleanTitle(raw: String): String {
+            var s = raw.replace('_', ' ')
+            s = FILE_EXT.replace(s, "")
+            s = LEADING_NUMBER.replace(s, "")
+            s = NOISE_PATTERNS.replace(s, " ")
+            s = DASH_NOISE.replace(s, "")
+            s = FEAT_TRAILING.replace(s, "")
+            s = s.replace(BRACKETS, " ")
+            return s.replace(Regex("\\s+"), " ").trim()
+        }
+
         fun from(track: AudioTrack): TrackQuery {
-            var title = track.title.replace('_', ' ').replace(LEADING_NUMBER, "")
+            var title = track.title.replace('_', ' ')
+            title = FILE_EXT.replace(title, "")
+            title = LEADING_NUMBER.replace(title, "")
             var artist: String? = track.artist.takeUnless { isUnknownArtist(it) }
 
             // Pola umum nama file: "Artis - Judul"
@@ -45,13 +69,12 @@ data class TrackQuery(val title: String, val artist: String?) {
                     title = right
                 }
             }
-            title = title.replace(BRACKETS, " ").replace(Regex("\\s+"), " ").trim()
+            title = cleanTitle(title)
             return TrackQuery(title, artist?.trim())
         }
 
         fun normalize(s: String): String = s.lowercase()
-            .replace(BRACKETS, " ")
-            .replace(Regex("\\b(feat|ft|featuring)\\b.*"), " ")
+            .let { cleanTitle(it) }
             .replace(Regex("[^\\p{L}\\p{Nd}]+"), " ")
             .trim()
     }

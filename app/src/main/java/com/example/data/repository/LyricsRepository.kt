@@ -1,6 +1,7 @@
 package com.example.data.repository
 
 import android.content.Context
+import android.util.Log
 import android.util.LruCache
 import com.example.data.model.AudioSourceType
 import com.example.data.model.AudioTrack
@@ -9,6 +10,7 @@ import com.example.data.model.LyricsData
 import com.example.data.model.LyricsUiState
 import com.example.data.remote.Http
 import com.example.data.remote.ItunesApi
+import com.example.data.remote.MusixmatchApi
 import com.example.data.remote.TrackQuery
 import com.example.data.remote.sha1Hex
 import kotlinx.coroutines.CancellationException
@@ -25,15 +27,18 @@ import kotlin.math.abs
 /**
  * Mengambil lirik (berinterval waktu / synced bila tersedia).
  *
- * iTunes Search API TIDAK menyediakan lirik, jadi alurnya:
- *  1. Cari di LRCLIB memakai metadata lagu itu sendiri.
- *  2. Bila tidak ketemu, normalkan judul/artis/album/durasi lewat iTunes Search lalu cari lagi.
- * Hasil di-cache di memori dan disk agar tidak mengunduh ulang.
+ * Alur pengambilan:
+ *  1. Cek memori cache & disk persisten (internal filesDir/saved_lyrics).
+ *  2. Jika user klik refresh, hapus cache lama dan lakukan re-fetch.
+ *  3. Cari di LRCLIB dengan query yang telah dioptimalkan (pembersihan judul, multi-endpoint).
+ *  4. Jika LRCLIB gagal terhubung / tidak menemukan lirik, lakukan fallback otomatis ke Musixmatch.
+ *  5. Jika masih belum ditemukan, coba normalkan judul/artis via iTunes lalu coba lagi ke LRCLIB & Musixmatch.
+ *  6. Simpan lirik yang berhasil dimuat ke penyimpanan persisten agar tersedia offline.
  */
 class LyricsRepository(context: Context) {
 
-    private val dir = File(context.applicationContext.cacheDir, "lyrics").apply { mkdirs() }
-    private val memory = LruCache<String, LyricsData>(32)
+    private val dir = File(context.applicationContext.filesDir, "saved_lyrics").apply { mkdirs() }
+    private val memory = LruCache<String, LyricsData>(48)
     private val notFound: MutableSet<String> = Collections.synchronizedSet(HashSet())
 
     suspend fun getLyrics(track: AudioTrack, forceRefresh: Boolean = false): LyricsUiState {
@@ -54,6 +59,8 @@ class LyricsRepository(context: Context) {
 
         if (forceRefresh) {
             notFound.remove(key)
+            memory.remove(key)
+            deleteDisk(key)
         } else {
             memory.get(key)?.let { return LyricsUiState.Success(it) }
             readDisk(key)?.let {
@@ -76,7 +83,7 @@ class LyricsRepository(context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
-            LyricsUiState.Error("Tidak dapat terhubung ke server lirik. Periksa koneksi internet lalu coba lagi.")
+            LyricsUiState.Error("Tidak dapat terhubung ke server lirik (LRCLIB & Musixmatch). Periksa koneksi internet lalu coba lagi.")
         } catch (e: Exception) {
             LyricsUiState.Error("Gagal memuat lirik: ${e.localizedMessage ?: "kesalahan tidak dikenal"}")
         }
@@ -84,48 +91,117 @@ class LyricsRepository(context: Context) {
 
     private suspend fun fetchRemote(track: AudioTrack, q: TrackQuery): LyricsData? {
         val durationSec = (track.durationMs / 1000).toInt()
+        val album = albumOf(track)
 
-        // 1) Metadata lagu sendiri
-        lookup(q.title, q.artist, albumOf(track), durationSec)?.let { return it }
-
-        // 2) Normalisasi metadata lewat iTunes, lalu coba lagi
-        val itunes = ItunesApi.searchSong(q.title, q.artist, track.durationMs, priority = true)
-        if (itunes != null) {
-            val sec = if (itunes.durationMs > 0) (itunes.durationMs / 1000).toInt() else durationSec
-            lookup(itunes.trackName, itunes.artistName, itunes.collectionName, sec)?.let { return it }
+        // 1) Coba LRCLIB dengan judul & artis yang sudah dibersihkan
+        val lrclibLyrics = tryLookupLrclib(q.title, q.artist, album, durationSec)
+        if (lrclibLyrics != null) {
+            return lrclibLyrics
         }
+
+        // 2) Fallback otomatis ke Musixmatch jika LRCLIB gagal / tidak menemukan
+        val mxmLyrics = tryLookupMusixmatch(q.title, q.artist, track.durationMs)
+        if (mxmLyrics != null) {
+            return mxmLyrics
+        }
+
+        // 3) Normalisasi metadata lewat iTunes Search API, lalu coba kedua provider lagi
+        try {
+            val itunes = ItunesApi.searchSong(q.title, q.artist, track.durationMs, priority = true)
+            if (itunes != null) {
+                val sec = if (itunes.durationMs > 0) (itunes.durationMs / 1000).toInt() else durationSec
+
+                // Coba LRCLIB dengan nama dari iTunes
+                val itunesLrclib = tryLookupLrclib(itunes.trackName, itunes.artistName, itunes.collectionName, sec)
+                if (itunesLrclib != null) {
+                    return itunesLrclib
+                }
+
+                // Coba Musixmatch dengan nama dari iTunes
+                val itunesMxm = tryLookupMusixmatch(itunes.trackName, itunes.artistName, itunes.durationMs)
+                if (itunesMxm != null) {
+                    return itunesMxm
+                }
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "iTunes normalization lookup skipped or failed: ${e.message}")
+        }
+
         return null
     }
 
-    private suspend fun lookup(
+    private suspend fun tryLookupLrclib(
         title: String,
         artist: String?,
         album: String?,
         durationSec: Int
     ): LyricsData? {
-        val artistName = artist?.takeUnless { TrackQuery.isUnknownArtist(it) }
+        return try {
+            lookupLrclib(title, artist, album, durationSec)
+        } catch (e: Exception) {
+            Log.w(TAG, "LRCLIB query failed or timed out (${e.message}), will fallback", e)
+            null
+        }
+    }
 
-        // Pencarian tepat (butuh artis, album, dan durasi)
-        if (artistName != null && !album.isNullOrBlank() && durationSec > 0) {
-            val url = "$BASE_URL/get?track_name=${enc(title)}&artist_name=${enc(artistName)}" +
-                "&album_name=${enc(album)}&duration=$durationSec"
+    private suspend fun tryLookupMusixmatch(
+        title: String,
+        artist: String?,
+        durationMs: Long
+    ): LyricsData? {
+        return try {
+            MusixmatchApi.fetchLyrics(title, artist, durationMs)
+        } catch (e: Exception) {
+            Log.w(TAG, "Musixmatch query failed: ${e.message}", e)
+            null
+        }
+    }
+
+    private suspend fun lookupLrclib(
+        title: String,
+        artist: String?,
+        album: String?,
+        durationSec: Int
+    ): LyricsData? {
+        val cleanTitle = TrackQuery.cleanTitle(title)
+        val artistName = artist?.takeUnless { TrackQuery.isUnknownArtist(it) }?.trim()
+
+        // 1. Pencarian tepat (jika artis dan durasi tersedia)
+        if (artistName != null && durationSec > 0) {
+            val url = if (!album.isNullOrBlank()) {
+                "$BASE_URL/get?track_name=${enc(cleanTitle)}&artist_name=${enc(artistName)}" +
+                    "&album_name=${enc(album)}&duration=$durationSec"
+            } else {
+                "$BASE_URL/get?track_name=${enc(cleanTitle)}&artist_name=${enc(artistName)}"
+            }
             val body = Http.getString(url)
             if (body != null) {
-                parseRecord(JSONObject(body))?.let { return it }
+                parseLrclibRecord(JSONObject(body))?.let { return it }
             }
         }
 
-        // Pencarian fuzzy
-        val params = if (artistName != null) {
-            "track_name=${enc(title)}&artist_name=${enc(artistName)}"
+        // 2. Pencarian terarah di LRCLIB (/api/search)
+        val searchParams = if (artistName != null) {
+            "track_name=${enc(cleanTitle)}&artist_name=${enc(artistName)}"
         } else {
-            "track_name=${enc(title)}"
+            "track_name=${enc(cleanTitle)}"
         }
-        val body = Http.getString("$BASE_URL/search?$params") ?: return null
-        return pickBest(JSONArray(body), title, artistName, durationSec)
+        val searchBody = Http.getString("$BASE_URL/search?$searchParams")
+        if (searchBody != null) {
+            pickBestLrclib(JSONArray(searchBody), cleanTitle, artistName, durationSec)?.let { return it }
+        }
+
+        // 3. Pencarian bebas luas (q=...) jika pencarian terarah belum membuahkan hasil
+        val broadQuery = if (artistName != null) "$cleanTitle $artistName" else cleanTitle
+        val broadBody = Http.getString("$BASE_URL/search?q=${enc(broadQuery)}")
+        if (broadBody != null) {
+            pickBestLrclib(JSONArray(broadBody), cleanTitle, artistName, durationSec)?.let { return it }
+        }
+
+        return null
     }
 
-    private fun pickBest(arr: JSONArray, title: String, artist: String?, durationSec: Int): LyricsData? {
+    private fun pickBestLrclib(arr: JSONArray, title: String, artist: String?, durationSec: Int): LyricsData? {
         val qTitle = TrackQuery.normalize(title)
         val qArtist = artist?.let { TrackQuery.normalize(it) }?.takeIf { it.isNotEmpty() }
 
@@ -141,13 +217,13 @@ class LyricsRepository(context: Context) {
             val t = TrackQuery.normalize(str(rec, "trackName") ?: "")
             val a = TrackQuery.normalize(str(rec, "artistName") ?: "")
             var score = when {
-                t == qTitle -> 3
-                t.isNotEmpty() && (t.contains(qTitle) || qTitle.contains(t)) -> 1
+                t == qTitle -> 4
+                t.isNotEmpty() && (t.contains(qTitle) || qTitle.contains(t)) -> 2
                 else -> continue
             }
             if (qArtist != null) {
                 score += when {
-                    a == qArtist -> 3
+                    a == qArtist -> 4
                     a.contains(qArtist) || qArtist.contains(a) -> 2
                     else -> continue
                 }
@@ -160,33 +236,38 @@ class LyricsRepository(context: Context) {
                     diff <= 2 -> 3
                     diff <= 5 -> 2
                     diff <= 10 -> 1
-                    diff > 20 -> -3
+                    diff > 25 -> -3
                     else -> 0
                 }
                 // Artis tidak diketahui: durasi wajib cocok agar tidak salah lagu
-                if (qArtist == null && diff > 5) continue
+                if (qArtist == null && diff > 8) continue
             } else if (qArtist == null) {
                 continue
             }
-            if (!str(rec, "syncedLyrics").isNullOrBlank()) score += 1
+            if (!str(rec, "syncedLyrics").isNullOrBlank()) score += 2
 
             if (score > bestScore) {
                 bestScore = score
                 best = rec
             }
         }
-        val threshold = if (qArtist != null) 4 else 6
-        return if (best != null && bestScore >= threshold) parseRecord(best) else null
+        val threshold = if (qArtist != null) 4 else 5
+        return if (best != null && bestScore >= threshold) parseLrclibRecord(best) else null
     }
 
-    private fun parseRecord(obj: JSONObject): LyricsData? {
+    private fun parseLrclibRecord(obj: JSONObject): LyricsData? {
         val instrumental = obj.optBoolean("instrumental", false)
         val synced = str(obj, "syncedLyrics")
         val plain = str(obj, "plainLyrics")
-        return buildData(synced, plain, instrumental)
+        return buildData(synced, plain, instrumental, source = "LRCLIB")
     }
 
-    private fun buildData(synced: String?, plain: String?, instrumental: Boolean): LyricsData? {
+    private fun buildData(
+        synced: String?,
+        plain: String?,
+        instrumental: Boolean,
+        source: String
+    ): LyricsData? {
         val lines = if (!synced.isNullOrBlank()) LrcParser.parse(synced) else emptyList()
         val plainText = plain?.takeIf { it.isNotBlank() }
         if (lines.isEmpty() && plainText == null && !instrumental) return null
@@ -194,11 +275,11 @@ class LyricsRepository(context: Context) {
             syncedLines = lines,
             plainText = plainText,
             instrumental = instrumental && lines.isEmpty() && plainText == null,
-            source = "LRCLIB"
+            source = source
         )
     }
 
-    // ---- cache disk ----
+    // ---- Penyimpanan Disk Persisten ----
 
     private fun readDisk(key: String): LyricsData? = try {
         val f = File(dir, "$key.json")
@@ -206,7 +287,8 @@ class LyricsRepository(context: Context) {
             null
         } else {
             val o = JSONObject(f.readText())
-            buildData(str(o, "synced"), str(o, "plain"), o.optBoolean("instrumental", false))
+            val src = o.optString("source").takeIf { !it.isNullOrBlank() } ?: "Tersimpan"
+            buildData(str(o, "synced"), str(o, "plain"), o.optBoolean("instrumental", false), source = src)
         }
     } catch (e: Exception) {
         null
@@ -224,9 +306,21 @@ class LyricsRepository(context: Context) {
                 .put("synced", synced)
                 .put("plain", data.plainText ?: "")
                 .put("instrumental", data.instrumental)
+                .put("source", data.source)
+                .put("saved_at", System.currentTimeMillis())
             File(dir, "$key.json").writeText(o.toString())
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "Gagal menulis lirik ke disk: ${e.message}")
         }
+    }
+
+    private fun deleteDisk(key: String) {
+        try {
+            val f = File(dir, "$key.json")
+            if (f.exists()) {
+                f.delete()
+            }
+        } catch (_: Exception) {}
     }
 
     // ---- util ----
@@ -244,6 +338,7 @@ class LyricsRepository(context: Context) {
         if (o.isNull(name)) null else o.optString(name).takeIf { it.isNotEmpty() }
 
     private companion object {
+        const val TAG = "LyricsRepository"
         const val BASE_URL = "https://lrclib.net/api"
     }
 }
