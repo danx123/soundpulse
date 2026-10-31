@@ -31,7 +31,9 @@ class EqualizerStore(context: Context) {
             currentPreset = prefs.getString(KEY_PRESET, defaults.currentPreset) ?: defaults.currentPreset,
             bassBoostStrength = prefs.getInt(KEY_BASS, defaults.bassBoostStrength).coerceIn(0, 1000),
             virtualizerStrength = prefs.getInt(KEY_VIRTUALIZER, defaults.virtualizerStrength).coerceIn(0, 1000),
-            reverbEffect = prefs.getString(KEY_REVERB, defaults.reverbEffect) ?: defaults.reverbEffect
+            reverbEffect = prefs.getString(KEY_REVERB, defaults.reverbEffect) ?: defaults.reverbEffect,
+            isReplayGainEnabled = prefs.getBoolean(KEY_REPLAYGAIN_ENABLED, defaults.isReplayGainEnabled),
+            replayGainTargetDb = prefs.getFloat(KEY_REPLAYGAIN_TARGET, defaults.replayGainTargetDb).coerceIn(0f, 12f)
         )
     }
 
@@ -43,6 +45,8 @@ class EqualizerStore(context: Context) {
             .putInt(KEY_BASS, state.bassBoostStrength)
             .putInt(KEY_VIRTUALIZER, state.virtualizerStrength)
             .putString(KEY_REVERB, state.reverbEffect)
+            .putBoolean(KEY_REPLAYGAIN_ENABLED, state.isReplayGainEnabled)
+            .putFloat(KEY_REPLAYGAIN_TARGET, state.replayGainTargetDb)
             .apply()
     }
 
@@ -54,5 +58,7 @@ class EqualizerStore(context: Context) {
         const val KEY_BASS = "bass_boost"
         const val KEY_VIRTUALIZER = "virtualizer"
         const val KEY_REVERB = "reverb"
+        const val KEY_REPLAYGAIN_ENABLED = "replaygain_enabled"
+        const val KEY_REPLAYGAIN_TARGET = "replaygain_target"
     }
 }

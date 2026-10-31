@@ -7,6 +7,7 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.audiofx.BassBoost
 import android.media.audiofx.Equalizer
+import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.PresetReverb
 import android.media.audiofx.Virtualizer
 import android.media.audiofx.Visualizer
@@ -46,6 +47,7 @@ class AudioPlayerEngine(
     private var hardwareVirtualizer: Virtualizer? = null
     private var hardwareReverb: PresetReverb? = null
     private var reverbPlayer: MediaPlayer? = null
+    private var hardwareLoudnessEnhancer: LoudnessEnhancer? = null
 
     private val visualizerSimulator = VisualizerSimulator()
 
@@ -407,6 +409,19 @@ class AudioPlayerEngine(
             // PresetReverb (auxiliary effect)
             setupReverb(player)
 
+            // LoudnessEnhancer (ReplayGain / Normalisasi Audio)
+            try {
+                val le = LoudnessEnhancer(audioSessionId).apply {
+                    val targetmB = (_equalizerState.value.replayGainTargetDb * 100).toInt().coerceIn(0, 3000)
+                    setTargetGain(targetmB)
+                    enabled = _equalizerState.value.isEnabled && _equalizerState.value.isReplayGainEnabled
+                }
+                hardwareLoudnessEnhancer = le
+            } catch (e: Exception) {
+                Log.w(TAG, "LoudnessEnhancer not supported on this session", e)
+            }
+            applyTrackVolumeNormalization(player)
+
         } catch (e: Exception) {
             Log.w(TAG, "Failed to setup hardware audio effects, using simulated equalizer", e)
         }
@@ -429,6 +444,8 @@ class AudioPlayerEngine(
             }
             hardwareBassBoost?.enabled = enabled
             hardwareVirtualizer?.enabled = enabled
+            hardwareLoudnessEnhancer?.enabled = enabled && _equalizerState.value.isReplayGainEnabled
+            applyTrackVolumeNormalization()
         } catch (e: Exception) {
             Log.w(TAG, "Error enabling/disabling audiofx", e)
         }
@@ -513,6 +530,50 @@ class AudioPlayerEngine(
         applyReverbToHardware()
     }
 
+    fun setReplayGainEnabled(enabled: Boolean) {
+        _equalizerState.value = _equalizerState.value.copy(isReplayGainEnabled = enabled)
+        persistEqualizer()
+        applyReplayGainToHardware()
+    }
+
+    fun setReplayGainTargetDb(targetDb: Float) {
+        val clamped = targetDb.coerceIn(0f, 12f)
+        _equalizerState.value = _equalizerState.value.copy(replayGainTargetDb = clamped)
+        persistEqualizer()
+        applyReplayGainToHardware()
+    }
+
+    private fun applyReplayGainToHardware() {
+        try {
+            val state = _equalizerState.value
+            val active = state.isEnabled && state.isReplayGainEnabled
+            hardwareLoudnessEnhancer?.let { le ->
+                val targetmB = (state.replayGainTargetDb * 100).toInt().coerceIn(0, 3000)
+                le.setTargetGain(targetmB)
+                le.enabled = active
+            }
+            applyTrackVolumeNormalization()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error applying ReplayGain / LoudnessEnhancer", e)
+        }
+    }
+
+    private fun applyTrackVolumeNormalization(player: MediaPlayer? = mediaPlayer) {
+        val p = player ?: return
+        val state = _equalizerState.value
+        try {
+            if (state.isEnabled && state.isReplayGainEnabled) {
+                // Headroom 0.95f untuk mencegah distorsi puncak saat penguatan dinamis aktif
+                val vol = 0.95f
+                p.setVolume(vol, vol)
+            } else {
+                p.setVolume(1.0f, 1.0f)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error applying track volume normalization", e)
+        }
+    }
+
     fun clearError() {
         _errorMessage.value = null
     }
@@ -523,6 +584,7 @@ class AudioPlayerEngine(
             hardwareBassBoost?.release()
             hardwareVirtualizer?.release()
             hardwareReverb?.release()
+            hardwareLoudnessEnhancer?.release()
         } catch (e: Exception) {
             Log.w(TAG, "Error releasing audio effects", e)
         } finally {
@@ -530,6 +592,7 @@ class AudioPlayerEngine(
             hardwareBassBoost = null
             hardwareVirtualizer = null
             hardwareReverb = null
+            hardwareLoudnessEnhancer = null
             reverbPlayer = null
         }
     }

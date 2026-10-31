@@ -536,7 +536,9 @@ fun SoundPulseMainScreen(
                     onBassBoostChange = { strength -> viewModel.setBassBoost(strength) },
                     onVirtualizerChange = { strength -> viewModel.setVirtualizer(strength) },
                     onApplyPreset = { preset -> viewModel.applyPreset(preset) },
-                    onSetReverb = { reverb -> viewModel.setReverb(reverb) }
+                    onSetReverb = { reverb -> viewModel.setReverb(reverb) },
+                    onReplayGainToggle = { viewModel.setReplayGainEnabled(it) },
+                    onReplayGainTargetChange = { viewModel.setReplayGainTargetDb(it) }
                 )
             }
         }

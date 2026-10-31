@@ -134,4 +134,10 @@
     <string name="queue_focus_current">Current</string>
     <string name="queue_playing_now">Playing #%1$d of %2$d • Tap to focus</string>
     <string name="queue_order_hint">%1$d tracks • Drag ≡ to reorder</string>
+
+    <!-- Equalizer Audio Normalization & ReplayGain -->
+    <string name="eq_normalization_title">Audio Normalization &amp; ReplayGain</string>
+    <string name="eq_normalization_desc">Balances loudness across all tracks automatically so quiet and loud tracks play at a uniform, comfortable volume.</string>
+    <string name="eq_normalization_target_gain">Target Loudness: +%1$.1f dB</string>
+    <string name="eq_normalization_active">Standard EBU R128 Active</string>
 </resources>

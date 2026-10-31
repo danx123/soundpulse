@@ -755,6 +755,10 @@ class AudioPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun setReverb(reverb: String) = engine.setReverb(reverb)
 
+    fun setReplayGainEnabled(enabled: Boolean) = engine.setReplayGainEnabled(enabled)
+
+    fun setReplayGainTargetDb(targetDb: Float) = engine.setReplayGainTargetDb(targetDb)
+
     // Sleep timer
     fun setSleepTimer(minutes: Int) {
         sleepTimerJob?.cancel()

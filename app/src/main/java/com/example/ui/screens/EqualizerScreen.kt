@@ -27,7 +27,10 @@ import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SurroundSound
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.ui.res.stringResource
+import com.example.R
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -80,6 +83,8 @@ fun EqualizerScreen(
     onVirtualizerChange: (Int) -> Unit,
     onApplyPreset: (EqualizerPreset) -> Unit,
     onSetReverb: (String) -> Unit,
+    onReplayGainToggle: (Boolean) -> Unit = {},
+    onReplayGainTargetChange: (Float) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val presets = EqualizerState.PRESETS
@@ -318,6 +323,153 @@ fun EqualizerScreen(
                 onValueChange = { onVirtualizerChange((it * 1000).toInt()) },
                 modifier = Modifier.weight(1f)
             )
+        }
+
+        // Audio Normalization & ReplayGain Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (state.isEnabled && state.isReplayGainEnabled) NeonCyan.copy(alpha = 0.5f)
+                else DarkCardBorder
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (state.isEnabled && state.isReplayGainEnabled)
+                                        NeonCyan.copy(alpha = 0.2f)
+                                    else DarkSurfaceVariant
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = null,
+                                tint = if (state.isEnabled && state.isReplayGainEnabled) NeonCyan else TextMuted,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = stringResource(R.string.eq_normalization_title),
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = TextPrimary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(NeonCyan.copy(alpha = 0.15f))
+                                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "EBU R128",
+                                        color = NeonCyan,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
+                            }
+                            Text(
+                                text = if (state.isEnabled && state.isReplayGainEnabled)
+                                    stringResource(R.string.eq_normalization_active)
+                                else
+                                    "Nonaktif",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (state.isEnabled && state.isReplayGainEnabled) HighResGreen else TextMuted
+                            )
+                        }
+                    }
+
+                    Switch(
+                        checked = state.isReplayGainEnabled,
+                        onCheckedChange = onReplayGainToggle,
+                        enabled = state.isEnabled,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = DarkBg,
+                            checkedTrackColor = NeonCyan,
+                            uncheckedThumbColor = TextMuted,
+                            uncheckedTrackColor = DarkSurfaceVariant
+                        ),
+                        modifier = Modifier.testTag("replaygain_switch")
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = stringResource(R.string.eq_normalization_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    lineHeight = 16.sp
+                )
+
+                if (state.isReplayGainEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Target Kenyaringan (Gain)",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TextSecondary
+                        )
+                        Text(
+                            text = stringResource(R.string.eq_normalization_target_gain, state.replayGainTargetDb),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = NeonCyan
+                        )
+                    }
+
+                    Slider(
+                        value = state.replayGainTargetDb.coerceIn(0f, 12f) / 12f,
+                        onValueChange = { norm ->
+                            val targetDb = norm * 12f
+                            onReplayGainTargetChange(targetDb)
+                        },
+                        enabled = state.isEnabled,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("replaygain_target_slider"),
+                        colors = SliderDefaults.colors(
+                            thumbColor = NeonCyan,
+                            activeTrackColor = NeonCyan,
+                            inactiveTrackColor = DarkSurfaceVariant
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "0 dB (Halus)", fontSize = 10.sp, color = TextMuted)
+                        Text(text = "+6 dB (Standar)", fontSize = 10.sp, color = NeonCyan)
+                        Text(text = "+12 dB (Maksimal)", fontSize = 10.sp, color = TextMuted)
+                    }
+                }
+            }
         }
 
         // Acoustic Reverb Profiles

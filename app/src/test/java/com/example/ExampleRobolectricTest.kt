@@ -70,6 +70,10 @@ class ExampleRobolectricTest {
     val flacFormat = AudioFormat.fromExtension("flac")
     assertEquals(AudioFormat.FLAC, flacFormat)
     assertTrue("FLAC harus lossless", flacFormat.isLossless)
+
+    val defaultEq = EqualizerState()
+    assertTrue("ReplayGain harus aktif secara default", defaultEq.isReplayGainEnabled)
+    assertEquals(6.0f, defaultEq.replayGainTargetDb, 0.01f)
   }
 
   @Test
